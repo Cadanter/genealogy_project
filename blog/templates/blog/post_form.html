@@ -1,0 +1,32 @@
+{% extends "blog/base.html" %}
+{% block title %}{{ title }} — Danie van Eeden{% endblock %}
+{% block content %}
+<div style="max-width:900px;margin:0 auto;padding:36px 24px;">
+  <div class="ph"><h1>{{ title }}</h1></div>
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:28px;">
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="form-grid">
+        <div class="fg"><label>Titel (Engels)</label>{{ form.title }}{% if form.title.errors %}<small style="color:var(--rust)">{{ form.title.errors|join:", " }}</small>{% endif %}</div>
+        <div class="fg"><label>Titel (Afrikaans)</label>{{ form.title_af }}</div>
+        <div class="fg"><label>Skakel / Slug</label>{{ form.slug }}</div>
+        <div class="fg"><label>Kategorie / Category</label>{{ form.category }}</div>
+        <div class="fg"><label>Taal / Language</label>{{ form.language }}</div>
+        <div class="fg"><label>Status</label>{{ form.status }}</div>
+        <div class="fg"><label>Gepubliseer op / Published at</label>{{ form.published_at }}</div>
+        <div class="fg"><label>Voorblad / Cover image</label>{{ form.cover_image }}</div>
+        <div class="fg full"><label>Uittreksel (Engels) / Excerpt</label>{{ form.excerpt }}</div>
+        <div class="fg full"><label>Uittreksel (Afrikaans)</label>{{ form.excerpt_af }}</div>
+        <div class="fg full"><label>Inhoud (Engels) / Body</label>{{ form.body }}{% if form.body.errors %}<small style="color:var(--rust)">{{ form.body.errors|join:", " }}</small>{% endif %}</div>
+        <div class="fg full"><label>Inhoud (Afrikaans)</label>{{ form.body_af }}</div>
+        <div class="fg full"><label>Etikette / Tags</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;">{{ form.tags }}</div></div>
+      </div>
+      <div class="form-actions">
+        <button type="submit" class="btn btn-primary">💾 Stoor / Save</button>
+        {% if post %}<a href="{{ post.get_absolute_url }}" class="btn btn-secondary">Kanselleer</a>
+        {% else %}<a href="{% url 'blog:post_list' %}" class="btn btn-secondary">Kanselleer</a>{% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

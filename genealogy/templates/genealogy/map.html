@@ -1,0 +1,84 @@
+{% extends "genealogy/base.html" %}
+{% load static %}
+{% block title %}Kaart — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Kaart{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="{% static 'genealogy/css/map.css' %}">
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Familiekaart</h2><p class="subtitle">{{ people_count }} mense met bekende liggings</p></div></div>
+<div class="card" style="padding:14px 20px;">
+  <div class="legend">
+    <span><span class="legend-dot" style="background:#3d6b4f"></span>Geboorteplek</span>
+    <span><span class="legend-dot" style="background:#1c1710"></span>Sterfplek</span>
+  </div>
+  <div id="status" style="font-size:12.5px;color:var(--muted);">Laai tans…</div>
+  <div class="progress-bar" id="pb"><div class="progress-fill" id="pf" style="width:0"></div></div>
+</div>
+<div id="map"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script>
+const people = {{ people_json|safe }};
+const map = L.map('map').setView([20, 0], 2);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© OpenStreetMap', maxZoom: 18
+}).addTo(map);
+const mkDot = c => L.divIcon({
+  className: '',
+  html: `<div style="width:11px;height:11px;border-radius:50%;background:${c};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>`,
+  iconSize: [11, 11], iconAnchor: [5, 5]
+});
+const birthDot = mkDot('#3d6b4f'), deathDot = mkDot('#1c1710');
+const markers = L.layerGroup().addTo(map), cache = {}, bounds = [];
+async function geocode(place) {
+  if (!place) return null;
+  if (cache[place] !== undefined) return cache[place];
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(place)}&format=json&limit=1`, { headers: { 'Accept-Language': 'af' } });
+    const d = await r.json();
+    cache[place] = d[0] ? [parseFloat(d[0].lat), parseFloat(d[0].lon)] : null;
+  } catch { cache[place] = null; }
+  return cache[place];
+}
+async function load() {
+  const status = document.getElementById('status'), pb = document.getElementById('pb'), pf = document.getElementById('pf');
+  people.forEach(p => {
+    if (p.birth_lat != null) cache[p.birth_place] = [p.birth_lat, p.birth_lng];
+    if (p.death_lat != null) cache[p.death_place] = [p.death_lat, p.death_lng];
+  });
+  const todo = [];
+  people.forEach(p => {
+    if (p.birth_place && cache[p.birth_place] === undefined) todo.push(p.birth_place);
+    if (p.death_place && cache[p.death_place] === undefined) todo.push(p.death_place);
+  });
+  const unique = [...new Set(todo)];
+  if (unique.length) { pb.style.display = 'block'; status.textContent = `Soek ${unique.length} plekke op…`; }
+  for (let i = 0; i < unique.length; i++) {
+    await geocode(unique[i]);
+    pf.style.width = Math.round((i + 1) / unique.length * 100) + '%';
+    status.textContent = `Plekke word opgespoor… ${i + 1}/${unique.length}`;
+    await new Promise(r => setTimeout(r, 1100));
+  }
+  pb.style.display = 'none';
+  let placed = 0;
+  people.forEach(p => {
+    const bc = cache[p.birth_place];
+    if (bc) {
+      L.marker(bc, { icon: birthDot }).addTo(markers)
+        .bindPopup(`<strong><a href="${p.url}" style="color:#7a5c2e">${p.name}</a></strong><br>Gebore: ${p.birth_place}${p.birth_year ? ' (' + p.birth_year + ')' : ''}`);
+      bounds.push(bc); placed++;
+    }
+    const dc = cache[p.death_place];
+    if (dc && p.death_place) {
+      L.marker(dc, { icon: deathDot }).addTo(markers)
+        .bindPopup(`<strong><a href="${p.url}" style="color:#7a5c2e">${p.name}</a></strong><br>Oorlede: ${p.death_place}${p.death_year ? ' (' + p.death_year + ')' : ''}`);
+      bounds.push(dc); placed++;
+    }
+  });
+  if (placed > 0) { map.fitBounds(bounds, { padding: [40, 40] }); status.textContent = `${placed} ligging${placed !== 1 ? 's' : ''} getoon.`; }
+  else { status.textContent = people.length ? 'Kon geen plekke opspoor nie. Gebruik meer spesifieke plekname.' : 'Nog geen mense met plekke nie.'; }
+}
+load();
+</script>
+{% endblock %}

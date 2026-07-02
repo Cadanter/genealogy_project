@@ -1,0 +1,40 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="af">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registreer — Van Eeden Familiegeskiedenis</title>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'genealogy/css/main.css' %}">
+</head>
+<body class="auth-body">
+<div class="auth-box">
+  <div class="auth-title">Van Eeden</div>
+  <div class="auth-sub">Familiegeskiedenis</div>
+  <p class="auth-intro">
+    Registreer om wysigings voor te stel en by te dra tot die familierekord.
+    'n Familiebeheerder sal u versoek hersien.
+  </p>
+
+  <form method="post">
+    {% csrf_token %}
+    {% for field in form %}
+    <div class="auth-fg">
+      <label class="auth-label">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<span class="auth-help">{{ field.help_text }}</span>{% endif %}
+      {% if field.errors %}
+        <ul class="errorlist">{% for e in field.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+      {% endif %}
+    </div>
+    {% endfor %}
+    <button type="submit" class="auth-btn">Versoek toegang</button>
+  </form>
+
+  <div class="auth-links">
+    Reeds geregistreer? <a href="{% url 'genealogy:login' %}">Teken in</a>
+  </div>
+</div>
+</body>
+</html>

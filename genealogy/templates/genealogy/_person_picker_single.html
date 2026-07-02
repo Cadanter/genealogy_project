@@ -1,0 +1,37 @@
+{# Usage: {% include "_person_picker_single.html" with field_name="person1" label="Persoon 1" selected_person=marriage.person1 %} #}
+
+<div class="fg" style="margin-bottom:14px;">
+  <label>{{ label }}</label>
+
+  <div style="display:flex;gap:8px;margin-bottom:10px;">
+    <input type="text" id="{{ field_name }}-search" placeholder="Soek naam…"
+           style="flex:1;" autocomplete="off">
+    <button type="button" class="btn btn-secondary"
+            onclick="spOpen('{{ field_name }}')">Kies</button>
+  </div>
+
+  <!-- Selected person card -->
+  <div id="{{ field_name }}-selected" style="margin-bottom:8px;">
+    {% if selected_person %}
+    <div class="pcard" style="min-width:140px;max-width:220px;cursor:default;position:relative;">
+      <div class="pcard-name">{{ selected_person.full_name }}</div>
+      <div class="pcard-dates" style="font-size:11px;">
+        {% if selected_person.birth_date %}geb. {{ selected_person.birth_year }}{% endif %}
+        {% if selected_person.is_deceased and selected_person.death_date %} – gest. {{ selected_person.death_year }}{% endif %}
+      </div>
+      {% if selected_person.birth_place %}
+        <div style="font-size:11px;color:var(--muted);">{{ selected_person.birth_place }}</div>
+      {% endif %}
+      <span class="badge badge-{% if selected_person.gender == 'M' %}male{% elif selected_person.gender == 'F' %}female{% else %}viewer{% endif %}"
+            style="margin-top:4px;">{{ selected_person.get_gender_display }}</span>
+      <button type="button"
+              onclick="spClear('{{ field_name }}')"
+              style="position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);">✕</button>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Hidden input carrying the FK value -->
+  <input type="hidden" name="{{ field_name }}" id="{{ field_name }}-value"
+         value="{{ selected_person.pk|default:'' }}">
+</div>

@@ -1,0 +1,158 @@
+/* ── GEDCOM Date Picker ─────────────────────────────────────────────── */
+
+.gdp-popup {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 1000;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  width: 300px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  box-sizing: border-box;
+}
+
+.gdp-hidden { display: none !important; }
+
+.gdp-section-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+  margin-bottom: 6px;
+  margin-top: 12px;
+}
+.gdp-section-label:first-child { margin-top: 0; }
+
+/* Modifier buttons */
+.gdp-mod-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-bottom: 4px;
+}
+
+.gdp-mod-btn {
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--cream);
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--muted);
+  cursor: pointer;
+  text-align: center;
+  transition: all .12s;
+}
+
+.gdp-mod-btn:hover {
+  border-color: var(--sepia);
+  color: var(--ink);
+}
+
+.gdp-mod-btn.active {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--cream);
+  font-weight: 500;
+}
+
+/* Date fields */
+.gdp-date-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.5fr;
+  gap: 7px;
+}
+
+.gdp-part { display: flex; flex-direction: column; gap: 3px; }
+
+.gdp-part-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--muted);
+}
+
+.gdp-part input {
+  padding: 6px 4px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  font-size: 14px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--ink);
+  background: white;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: center;
+}
+
+.gdp-part input:focus {
+  outline: none;
+  border-color: var(--sepia);
+  box-shadow: 0 0 0 3px rgba(122,92,46,.1);
+}
+
+.gdp-part input.gdp-unknown {
+  color: var(--border);
+}
+
+/* Tussen divider */
+.gdp-bet-divider {
+  text-align: center;
+  font-size: 11px;
+  color: var(--muted);
+  margin: 8px 0 4px;
+}
+
+/* Preview */
+.gdp-preview {
+  background: var(--cream);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 7px 10px;
+  font-size: 13px;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--ink);
+  min-height: 32px;
+  word-break: break-all;
+}
+
+/* Action buttons */
+.gdp-actions {
+  display: flex;
+  gap: 7px;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.gdp-btn {
+  padding: 6px 13px;
+  border-radius: 3px;
+  font-size: 12.5px;
+  font-family: 'DM Sans', sans-serif;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--cream);
+  color: var(--ink);
+  transition: all .12s;
+}
+
+.gdp-btn:hover { border-color: var(--muted); }
+
+.gdp-btn-primary {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--cream);
+  font-weight: 500;
+}
+
+.gdp-btn-primary:hover { background: #2c2416; }
+
+/* Age display */
+.gdp-age {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 4px;
+}

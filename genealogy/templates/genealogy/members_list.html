@@ -1,0 +1,51 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Lede — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Lede{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Familielede</h2><p class="subtitle">{{ members.count }} geregistreerde lid{{ members.count|pluralize:"e" }}</p></div></div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Naam</th><th>Gebruikersnaam</th><th>E-pos</th><th>Rol</th><th>Aangemeld</th><th>Verbinding</th><th>Aksies</th></tr></thead>
+  <tbody>
+    {% for m in members %}
+    <tr>
+      <td>{{ m.user.get_full_name|default:"—" }}</td>
+      <td>{{ m.user.username }}</td>
+      <td>{{ m.user.email }}</td>
+      <td><span class="badge badge-{{ m.role }}">{{ m.get_role_display }}</span></td>
+      <td style="font-size:12px;color:var(--muted);">{{ m.joined|date:"d M Y" }}</td>
+      <td style="font-size:12px;color:var(--muted);max-width:200px;">{{ m.bio|truncatechars:80|default:"—" }}</td>
+      <td>
+        <!-- Only show actions for non-admin users -->
+        {% if request.user.is_superuser%}
+        <div style="display:flex;gap:5px;flex-wrap:wrap;">
+          <form method="post" action="{% url 'genealogy:approve_member' m.user.pk %}" style="display:flex;gap:5px;">
+            {% csrf_token %}
+            {% if m.role == 'pending' %}
+              <button name="action" value="approve" class="btn btn-secondary btn-sm">Keur goed</button>
+              <button name="action" value="trust" class="btn btn-sm" style="background:#dff0e6;color:#2a5c3a;border:1px solid #b4ddc2;">Vertrou</button>
+            {% elif m.role == 'viewer' %}
+              <button name="action" value="trust" class="btn btn-sm" style="background:#dff0e6;color:#2a5c3a;border:1px solid #b4ddc2;">↑ Vertrou</button>
+            {% elif m.role == 'trusted' %}
+              <button name="action" value="approve" class="btn btn-secondary btn-sm">↓ Kyker</button>
+            {% elif m.role == 'admin' %}
+              <button name="action" value="trust" class="btn btn-secondary btn-sm">↓ Vertrou</button>
+            {% endif %}
+          </form>
+          <a href="{% url 'genealogy:member_edit' m.user.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+          <form method="post" action="{% url 'genealogy:member_delete' m.user.pk %}" style="display:inline;"
+                onsubmit="return confirm('Is jy seker jy wil {{ m.user.username }} verwyder?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+          </form>
+        </div>
+        {% else %}
+        <span style="font-size:11.5px;color:var(--muted);">Beheerder</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:32px;">Nog geen lede nie.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

@@ -1,0 +1,38 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Verhoudings — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Verhoudings{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:relationship_create' %}" class="btn btn-primary btn-sm">+ Voeg verhouding by</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Verhoudings</h2><p class="subtitle">{{ relationships.count }} rekord{{ relationships.count|pluralize:"s" }}</p></div></div>
+<div class="card"><div class="table-wrap"><table>
+  <thead>
+    <tr><th>Ouer</th><th>Kind</th><th>Verhouding</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for m in relationships %}
+    <tr>
+      <td><a href="{{ m.person.get_absolute_url }}">{{ m.person.full_name }}</a></td>
+      <td><a href="{{ m.relative.get_absolute_url }}">{{ m.relative.full_name }}</a></td>
+      <td><span class="badge badge-viewer">{{ m.get_relationship_type_display }}</span></td>
+      <td style="white-space:nowrap;">
+        <a href="{% url 'genealogy:relationship_detail' m.pk %}" class="btn btn-secondary btn-sm">Sien</a>
+        {% if profile and profile.can_edit %}
+          <a href="{% url 'genealogy:relationship_edit' m.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+          <form method="post" action="{% url 'genealogy:relationship_delete' m.pk %}" style="display:inline;"
+                onsubmit="return confirm('Is jy seker jy wil hierdie verhouding verwyder?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:32px;">Geen verwantskappe aangeteken nie.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

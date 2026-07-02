@@ -1,0 +1,92 @@
+{% extends "genealogy/base.html" %}
+{% block title %}{{ document.title }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:document_list' %}">Dokumente</a> <span>›</span> {{ document.title }}
+{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:document_edit' document.pk %}" class="btn btn-primary btn-sm">Wysig</a>
+    <form method="post" action="{% url 'genealogy:document_delete' document.pk %}" style="display:inline;"
+          onsubmit="return confirm('Is jy seker jy wil hierdie dokument verwyder?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+    </form>
+  {% endif %}
+{% endblock %}
+{% block content %}
+  <div class="ph">
+    <div>
+      <h2>{{ document.title }}</h2>
+      <p class="subtitle">{{ document.get_document_type_display }}</p>
+    </div>
+  </div>
+  <div class="detail-grid">
+    <div>
+      {% if document.image %}
+        <img src="{{ document.image.url }}" style="width:100%;border-radius:4px;border:1px solid var(--border);margin-bottom:14px;" alt="{{ document.title }}">
+      {% endif %}
+      {% if document.file %}
+        <div class="card" style="text-align:center;">
+          {% if document.file.name|lower|slice:"-4:" == ".pdf" %}
+          <canvas id="pdf-canvas" style="max-width:100%;border-radius:4px;border:1px solid var(--border);"></canvas>
+          <div style="margin-top:10px;">
+            <a href="{{ document.file.url }}" class="btn btn-primary" download>Laai lêer af</a>
+          </div>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+          <script>
+            (function () {
+              pdfjsLib.GlobalWorkerOptions.workerSrc =
+                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+              pdfjsLib.getDocument('{{ document.file.url }}').promise.then(function (pdf) {
+                pdf.getPage(1).then(function (page) {
+                  var canvas   = document.getElementById('pdf-canvas');
+                  var viewport = page.getViewport({ scale: 1.5 });
+                  canvas.width  = viewport.width;
+                  canvas.height = viewport.height;
+                  page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+                });
+              });
+            })();
+          </script>
+        {% else %}
+          <p style="font-size:28px;margin-bottom:8px;">◻</p>
+          <a href="{{ document.file.url }}" class="btn btn-primary" download>Laai lêer af</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  <div>
+    <div class="card">
+      <div class="info-row">
+        <div class="ir-label">Datum</div>
+        <div class="ir-value">{{ document.date|default:"Onbekend" }}</div>
+      </div>
+      <div class="info-row">
+        <div class="ir-label">Bron</div>
+        <div class="ir-value">{{ document.source|default:"Nie gespesifiseer nie" }}</div>
+      </div>
+      <div class="info-row">
+        <div class="ir-label">Opgelaai deur</div>
+        <div class="ir-value">{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username|default:"Onbekend" }}</div>
+      </div>
+      {% if document.description %}
+        <div class="info-row">
+          <div class="ir-label">Beskrywing</div>
+          <div class="ir-value">{{ document.description }}</div>
+        </div>
+      {% endif %}
+    </div>
+    {% if document.people.exists %}
+      <div class="card">
+        <h3>Verwante mense</h3>
+        <div class="family-list">
+          {% for p in document.people.all %}
+            <a href="{{ p.get_absolute_url }}" class="flink">⊙ {{ p.full_name }}</a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  </div>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "genealogy/base.html" %}
+{% block title %}{{ marriage }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:marriage_list' %}">Huwelike</a> <span>›</span>
+  {{ marriage }}
+{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:marriage_edit' marriage.pk %}" class="btn btn-primary btn-sm">Wysig</a>
+    <form method="post" action="{% url 'genealogy:marriage_delete' marriage.pk %}" style="display:inline;"
+          onsubmit="return confirm('Is jy seker jy wil hierdie huwelik verwyder?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+    </form>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>{{ marriage }}</h2><p class="subtitle">{{ marriage.get_status_display }}</p></div></div>
+
+<div class="card" style="max-width:640px;">
+  <table style="width:100%;border-collapse:collapse;">
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);width:160px;">Persoon 1</th>
+        <td style="padding:8px 0;"><a href="{{ marriage.person1.get_absolute_url }}">{{ marriage.person1.full_name }}</a></td></tr>
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Persoon 2</th>
+        <td style="padding:8px 0;"><a href="{{ marriage.person2.get_absolute_url }}">{{ marriage.person2.full_name }}</a></td></tr>
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Huweliksdatum</th>
+        <td style="padding:8px 0;">{{ marriage.marriage_date_display|default:"—" }}</td></tr>
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Huweliksplek</th>
+        <td style="padding:8px 0;">{{ marriage.marriage_place|default:"—" }}</td></tr>
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Status</th>
+        <td style="padding:8px 0;"><span class="badge badge-viewer">{{ marriage.get_status_display }}</span></td></tr>
+    {% if marriage.end_date %}
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Einddatum</th>
+        <td style="padding:8px 0;">{{ marriage.end_date_display }}</td></tr>
+    {% endif %}
+    {% if marriage.end_place %}
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Eindplek</th>
+        <td style="padding:8px 0;">{{ marriage.end_place }}</td></tr>
+    {% endif %}
+    {% if marriage.notes %}
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);vertical-align:top;">Notas</th>
+        <td style="padding:8px 0;">{{ marriage.notes|linebreaksbr }}</td></tr>
+    {% endif %}
+  </table>
+</div>
+
+{% if documents %}
+<div class="ph" style="margin-top:24px;"><div><h3>Dokumente</h3></div></div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Titel</th><th>Tipe</th><th>Datum</th><th></th></tr></thead>
+  <tbody>
+    {% for doc in documents %}
+    <tr>
+      <td><a href="{{ doc.get_absolute_url }}">{{ doc.title }}</a></td>
+      <td>{{ doc.get_document_type_display }}</td>
+      <td>{{ doc.date|default:"—" }}</td>
+      <td style="white-space:nowrap;">
+        <a href="{{ doc.get_absolute_url }}" class="btn btn-secondary btn-sm">Sien</a>
+        {% if profile and profile.can_edit %}
+          <a href="{% url 'genealogy:document_edit' doc.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+          <form method="post" action="{% url 'genealogy:document_delete' doc.pk %}" style="display:inline;"
+                onsubmit="return confirm('Is jy seker jy wil hierdie dokument verwyder?')">
+            {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endif %}
+{% endblock %}

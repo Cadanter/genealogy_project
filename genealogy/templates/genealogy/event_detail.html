@@ -1,0 +1,52 @@
+{% extends "genealogy/base.html" %}
+{% block title %}{{ event.title }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:event_list' %}">Gebeure</a> <span>›</span>
+  {{ event.title }}
+{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:event_edit' event.pk %}" class="btn btn-primary btn-sm">Wysig</a>
+    <form method="post" action="{% url 'genealogy:event_delete' event.pk %}" style="display:inline;"
+          onsubmit="return confirm('Is jy seker jy wil hierdie gebeurtenis verwyder?')">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+    </form>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>{{ event.title }}</h2><p class="subtitle">{{ event.get_event_type_display }}</p></div></div>
+
+<div class="card" style="max-width:640px;">
+  <table style="width:100%;border-collapse:collapse;">
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);width:140px;">Datum</th>
+        <td style="padding:8px 0;">{{ event.date|default:"—" }}</td></tr>
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Plek</th>
+        <td style="padding:8px 0;">{{ event.place|default:"—" }}</td></tr>
+    {% if event.description %}
+    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);vertical-align:top;">Beskrywing</th>
+        <td style="padding:8px 0;">{{ event.description|linebreaksbr }}</td></tr>
+    {% endif %}
+  </table>
+</div>
+
+{% if event.people.all %}
+<div class="ph" style="margin-top:24px;"><div><h3>Mense</h3></div></div>
+<div class="person-grid">
+  {% for p in event.people.all %}
+  <a href="{{ p.get_absolute_url }}" class="pcard">
+    <div class="pcard-name">{{ p.full_name }}</div>
+    <div class="pcard-dates">
+      {% if p.birth_date %}geb. {{ p.birth_year }}{% endif %}
+      {% if p.is_deceased and p.death_date %} – gest. {{ p.death_year }}{% endif %}
+    </div>
+    {% if p.birth_place %}<div style="font-size:11.5px;color:var(--muted);">{{ p.birth_place }}</div>{% endif %}
+    <span class="badge badge-{% if p.gender == 'M' %}male{% elif p.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;align-self:flex-start;">
+      {{ p.get_gender_display }}
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

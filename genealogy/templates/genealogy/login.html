@@ -1,0 +1,39 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="af">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Teken in — Van Eeden Familiegeskiedenis</title>
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'genealogy/css/main.css' %}">
+</head>
+<body class="auth-body">
+<div class="auth-box">
+  <div class="auth-title">Van Eeden</div>
+  <div class="auth-sub">Familiegeskiedenis</div>
+
+  {% if form.non_field_errors %}
+    <div class="auth-error">{{ form.non_field_errors|join:", " }}</div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    <div class="auth-fg">
+      <label class="auth-label">Gebruikersnaam</label>
+      {{ form.username }}
+    </div>
+    <div class="auth-fg">
+      <label class="auth-label">Wagwoord</label>
+      {{ form.password }}
+    </div>
+    <button type="submit" class="auth-btn">Teken in</button>
+  </form>
+
+  <div class="auth-links">
+    Nog nie 'n lid nie? <a href="{% url 'genealogy:register' %}">Versoek toegang</a>
+    &nbsp;·&nbsp; <a href="{% url 'genealogy:person_list' %}">Blaai as gasheer</a>
+  </div>
+</div>
+</body>
+</html>

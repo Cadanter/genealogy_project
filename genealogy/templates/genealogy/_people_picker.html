@@ -1,0 +1,182 @@
+<div class="fg" style="margin-bottom:14px;">
+  <label>Mense</label>
+
+  <!-- Search bar -->
+  <div style="display:flex;gap:8px;margin-bottom:10px;">
+    <input type="text" id="pp-search" placeholder="Soek naam…"
+           style="flex:1;" autocomplete="off">
+    <button type="button" class="btn btn-secondary" onclick="ppOpenModal()">Voeg by</button>
+  </div>
+
+  <!-- Selected people cards -->
+  <div id="pp-selected" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+    <!-- populated by JS on load for edit forms -->
+  </div>
+
+  <!-- Hidden checkboxes (submitted with form) -->
+  <div id="pp-hidden"></div>
+</div>
+
+<!-- Modal overlay -->
+<div id="pp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+     z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--card-bg);border-radius:10px;padding:24px;
+              width:min(560px,92vw);max-height:80vh;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <strong>Kies mense</strong>
+      <button type="button" class="btn btn-secondary" style="padding:2px 10px;"
+              onclick="ppCloseModal()">✕</button>
+    </div>
+    <input type="text" id="pp-modal-search" placeholder="Soek naam of plek…"
+           oninput="ppFilter(this.value)" autocomplete="off">
+    <div id="pp-results" style="overflow-y:auto;flex:1;display:flex;flex-wrap:wrap;gap:10px;
+         padding:4px 0;">
+    </div>
+  </div>
+</div>
+
+<script>
+(function () {
+  // All people from Django — injected once
+  const ALL_PEOPLE = [
+    {% for p in all_people %}
+    {
+      id: {{ p.pk }},
+      name: "{{ p.full_name|escapejs }}",
+      birth_year: "{{ p.birth_year|default:'' }}",
+      death_year: "{{ p.death_year|default:'' }}",
+      is_deceased: {{ p.is_deceased|yesno:"true,false" }},
+      birth_place: "{{ p.birth_place|escapejs }}",
+      gender: "{{ p.gender }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  // Pre-selected IDs for edit forms
+  const PRE_SELECTED = [
+    {% if selected_people %}
+        {% for pid in selected_people %}{{ pid.0 }}{% if not forloop.last %},{% endif %}{% endfor %}
+    {% endif %}
+];
+
+  let selected = new Set(PRE_SELECTED);
+
+  function genderClass(g) {
+    if (g === 'M') return 'male';
+    if (g === 'F') return 'female';
+    return 'viewer';
+  }
+
+  function renderSelected() {
+    const box    = document.getElementById('pp-selected');
+    const hidden = document.getElementById('pp-hidden');
+    box.innerHTML    = '';
+    hidden.innerHTML = '';
+
+    selected.forEach(function (id) {
+      const p = ALL_PEOPLE.find(x => x.id === id);
+      if (!p) return;
+
+      // Card
+      const card = document.createElement('div');
+      card.className = 'pcard';
+      card.style.cssText = 'min-width:140px;max-width:180px;cursor:default;position:relative;';
+      card.innerHTML =
+        '<div class="pcard-name">' + p.name + '</div>' +
+        '<div class="pcard-dates" style="font-size:11px;">' +
+          (p.birth_year ? 'geb. ' + p.birth_year : '') +
+          (p.is_deceased && p.death_year ? ' – gest. ' + p.death_year : '') +
+        '</div>' +
+        (p.birth_place ? '<div style="font-size:11px;color:var(--muted);">' + p.birth_place + '</div>' : '') +
+        '<span class="badge badge-' + genderClass(p.gender) + '" style="margin-top:4px;">' +
+          (p.gender === 'M' ? 'Manlik' : p.gender === 'F' ? 'Vroulik' : 'Ander') +
+        '</span>' +
+        '<button type="button" onclick="ppRemove(' + id + ')" ' +
+          'style="position:absolute;top:4px;right:4px;background:none;border:none;' +
+          'cursor:pointer;font-size:13px;color:var(--muted);">✕</button>';
+      box.appendChild(card);
+
+      // Hidden checkbox
+      const chk = document.createElement('input');
+      chk.type    = 'checkbox';
+      chk.name    = 'people';
+      chk.value   = id;
+      chk.checked = true;
+      chk.hidden  = true;
+      hidden.appendChild(chk);
+    });
+  }
+
+  function ppFilter(q) {
+    const results = document.getElementById('pp-results');
+    const lower   = q.toLowerCase();
+    const matches = ALL_PEOPLE.filter(function (p) {
+      return p.name.toLowerCase().includes(lower) ||
+             p.birth_place.toLowerCase().includes(lower);
+    });
+
+    results.innerHTML = '';
+    matches.forEach(function (p) {
+      const card = document.createElement('div');
+      card.className = 'pcard';
+      card.style.cssText = 'min-width:140px;max-width:180px;cursor:pointer;' +
+        (selected.has(p.id) ? 'opacity:.45;' : '');
+      card.innerHTML =
+        '<div class="pcard-name">' + p.name + '</div>' +
+        '<div class="pcard-dates" style="font-size:11px;">' +
+          (p.birth_year ? 'geb. ' + p.birth_year : '') +
+          (p.is_deceased && p.death_year ? ' – gest. ' + p.death_year : '') +
+        '</div>' +
+        (p.birth_place ? '<div style="font-size:11px;color:var(--muted);">' + p.birth_place + '</div>' : '') +
+        '<span class="badge badge-' + genderClass(p.gender) + '" style="margin-top:4px;">' +
+          (p.gender === 'M' ? 'Manlik' : p.gender === 'F' ? 'Vroulik' : 'Ander') +
+        '</span>';
+      card.addEventListener('click', function () {
+        if (!selected.has(p.id)) {
+          selected.add(p.id);
+          renderSelected();
+          ppFilter(document.getElementById('pp-modal-search').value);
+        }
+      });
+      results.appendChild(card);
+    });
+
+    if (matches.length === 0) {
+      results.innerHTML = '<p style="color:var(--muted);font-size:13px;">Geen mense gevind nie.</p>';
+    }
+  }
+
+  window.ppOpenModal = function () {
+    const modal = document.getElementById('pp-modal');
+    modal.style.display = 'flex';
+    const inp = document.getElementById('pp-modal-search');
+    inp.value = '';
+    ppFilter('');
+    inp.focus();
+  };
+
+  window.ppCloseModal = function () {
+    document.getElementById('pp-modal').style.display = 'none';
+  };
+
+  window.ppRemove = function (id) {
+    selected.delete(id);
+    renderSelected();
+  };
+
+  // Sync the search bar above the picker (optional convenience)
+  document.getElementById('pp-search').addEventListener('input', function () {
+    document.getElementById('pp-modal-search').value = this.value;
+    ppOpenModal();
+    ppFilter(this.value);
+  });
+
+  // Close modal on overlay click
+  document.getElementById('pp-modal').addEventListener('click', function (e) {
+    if (e.target === this) ppCloseModal();
+  });
+
+  // Initial render for edit forms
+  renderSelected();
+})();
+</script>

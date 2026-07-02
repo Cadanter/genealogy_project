@@ -1,0 +1,45 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Voorgestelde wysigings — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Hersien wysigings{% endblock %}
+{% block content %}
+<div class="ph">
+  <div><h2>Voorgestelde wysigings</h2><p class="subtitle">{{ edits.count }} wysiging{{ edits.count|pluralize:"s" }} wag op hersiening</p></div>
+</div>
+{% if edits %}
+{% for edit in edits %}
+<div class="edit-card">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+    <div>
+      <span class="badge badge-{% if edit.action == 'create' %}trusted{% else %}viewer{% endif %}" style="margin-bottom:6px;">
+        {% if edit.action == 'create' %}Nuwe rekord{% else %}Wysiging{% endif %}
+      </span>
+      <h4>{{ edit.object_repr }}</h4>
+      <div style="font-size:12px;color:var(--muted);">
+        Voorgestel deur <strong>{{ edit.proposed_by.get_full_name|default:edit.proposed_by.username }}</strong>
+        · {{ edit.submitted_at|date:"d M Y H:i" }}
+      </div>
+      {% if edit.note %}<div style="font-size:12.5px;font-style:italic;margin-top:6px;color:var(--ink);">"{{ edit.note }}"</div>{% endif %}
+    </div>
+    <a href="{% url 'genealogy:review_edit' edit.pk %}" class="btn btn-primary btn-sm">Hersien →</a>
+  </div>
+  {% if edit.field_changes %}
+  <table class="diff-table">
+    <tr><th>Veld</th><th>Huidige waarde</th><th>Voorgestelde waarde</th></tr>
+    {% for field, vals in edit.field_changes.items %}
+    <tr>
+      <td>{{ field }}</td>
+      <td class="diff-old">{{ vals.0|default:"—" }}</td>
+      <td class="diff-new">{{ vals.1|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="card" style="text-align:center;padding:48px;">
+  <p style="font-size:28px;margin-bottom:10px;">✓</p>
+  <p style="color:var(--muted);">Alles klaar — geen wysigings wag nie.</p>
+</div>
+{% endif %}
+{% endblock %}

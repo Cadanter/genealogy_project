@@ -1,0 +1,20 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Verwyder Huwelik — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:marriage_list' %}">Huwelike</a> <span>›</span> Verwyder
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Verwyder Huwelik</h2></div></div>
+<div class="card" style="max-width:480px;">
+  <p>Is jy seker jy wil die huwelik tussen <strong>{{ marriage.person1.full_name }}</strong> en
+     <strong>{{ marriage.person2.full_name }}</strong> permanent verwyder?</p>
+  <div class="form-actions">
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Ja, verwyder</button>
+    </form>
+    <a href="{% url 'genealogy:marriage_detail' marriage.pk %}" class="btn btn-secondary">Kanselleer</a>
+  </div>
+</div>
+{% endblock %}

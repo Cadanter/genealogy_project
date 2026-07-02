@@ -1,0 +1,103 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Tuisblad — Van Eeden Familiegeskiedenis{% endblock %}
+
+{% block content %}
+<div class="ph">
+  <div>
+    <h2>Van Eeden Familiegeskiedenis</h2>
+    <p class="subtitle">ʼn Gedeelde rekord van ons familie se nalatenskap</p>
+  </div>
+  {% if profile and profile.can_edit %}
+    <div class="ph-actions">
+      <a href="{% url 'genealogy:person_create' %}" class="btn btn-primary">+ Voeg persoon by</a>
+    </div>
+  {% endif %}
+</div>
+
+{% if profile and profile.role == 'pending' %}
+<div class="alert alert-warning" style="margin-bottom:20px">
+  ⏳ U rekening wag op <strong>goedkeuring</strong> deur ʼn familiebeheerder. U kan intussen vryelik in die argief blaai.
+</div>
+{% endif %}
+
+{% if profile and profile.is_admin and pending_members %}
+<div class="card" style="border-left:3px solid var(--gold); margin-bottom:20px;">
+  <h3 style="margin-bottom:14px;">⏳ Lede wat wag op goedkeuring ({{ pending_members|length }})</h3>
+  {% for mp in pending_members %}
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">
+    <div style="flex:1">
+      <div style="font-weight:500;font-size:14px;">{{ mp.user.get_full_name|default:mp.user.username }}</div>
+      <div style="font-size:12px;color:var(--muted);">{{ mp.user.email }} · aangemeld {{ mp.joined|date:"d M Y" }}</div>
+      {% if mp.bio %}<div style="font-size:12px;color:var(--ink);margin-top:3px;font-style:italic;">"{{ mp.bio|truncatechars:120 }}"</div>{% endif %}
+    </div>
+    <form method="post" action="{% url 'genealogy:approve_member' mp.user.pk %}" style="display:flex;gap:6px;">
+      {% csrf_token %}
+      <button name="action" value="approve" class="btn btn-secondary btn-sm">✓ Keur goed</button>
+      <button name="action" value="trust" class="btn btn-sm" style="background:#dff0e6;color:#2a5c3a;border-color:#b4ddc2;">★ Vertrou</button>
+      <button name="action" value="reject" class="btn btn-sm btn-danger">✗</button>
+    </form>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if profile and profile.is_admin and pending_edits %}
+<div class="card" style="border-left:3px solid var(--rust); margin-bottom:20px;">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <h3 style="margin:0;">📝 Voorgestelde wysigings wag op hersiening ({{ pending_edits|length }})</h3>
+    <a href="{% url 'genealogy:pending_edits' %}" class="btn btn-secondary btn-sm">Sien almal</a>
+  </div>
+  {% for edit in pending_edits %}
+  <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;">
+    <span class="badge badge-{% if edit.action == 'create' %}trusted{% else %}viewer{% endif %}">
+      {% if edit.action == 'create' %}Nuut{% else %}Wysiging{% endif %}
+    </span>
+    <span style="flex:1"><strong>{{ edit.object_repr }}</strong> — voorgestel deur {{ edit.proposed_by.get_full_name|default:edit.proposed_by.username }}</span>
+    <a href="{% url 'genealogy:review_edit' edit.pk %}" class="btn btn-secondary btn-sm">Hersien →</a>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid-4">
+  <div class="stat"><div class="stat-n">{{ total_people }}</div><div class="stat-l">Mense</div></div>
+  <div class="stat"><div class="stat-n">{{ total_marriages }}</div><div class="stat-l">Huwelike</div></div>
+  <div class="stat"><div class="stat-n">{{ total_documents }}</div><div class="stat-l">Dokumente</div></div>
+  <div class="stat"><div class="stat-n">{{ recent_audit|length }}</div><div class="stat-l">Onlangse wysigings</div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+  <div class="card">
+    <h3>Onlangs bygevoeg</h3>
+    {% for p in recent_people %}
+    <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+      <a href="{{ p.get_absolute_url }}" style="font-family:'EB Garamond',serif;font-size:15px;color:var(--sepia);text-decoration:none;">{{ p.full_name }}</a>
+      <span style="font-size:11.5px;color:var(--muted);">{% if p.birth_date %}geb. {{ p.birth_date.year }}{% endif %}</span>
+    </div>
+    {% empty %}
+    <p style="color:var(--muted);font-size:13px;">Nog geen mense nie. <a href="{% url 'genealogy:person_create' %}" style="color:var(--sepia);">Voeg die eerste een by.</a></p>
+    {% endfor %}
+    <div style="margin-top:12px;"><a href="{% url 'genealogy:person_list' %}" class="btn btn-secondary btn-sm">Sien almal →</a></div>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <h3 style="margin:0;">Wysigingsgeskiedenis</h3>
+      <a href="{% url 'genealogy:audit_log' %}" class="btn btn-secondary btn-sm">Volle log</a>
+    </div>
+    {% for log in recent_audit %}
+    <div class="audit-row">
+      <div class="audit-action {{ log.action }}">
+        {% if log.action == 'create' %}Geskep{% elif log.action == 'update' %}Gewysig{% else %}Verwyder{% endif %}
+      </div>
+      <div style="flex:1">
+        <div>{{ log.object_repr }}</div>
+        <div class="audit-meta">{{ log.user.get_full_name|default:log.user.username|default:"Stelsel" }} · {{ log.timestamp|date:"d M Y H:i" }}</div>
+      </div>
+    </div>
+    {% empty %}
+    <p style="color:var(--muted);font-size:13px;">Nog geen wysigings nie.</p>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

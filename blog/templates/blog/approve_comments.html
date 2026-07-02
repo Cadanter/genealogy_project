@@ -1,0 +1,29 @@
+{% extends "blog/base.html" %}
+{% block title %}Keur kommentare goed{% endblock %}
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:36px 24px;">
+  <div class="ph"><h1>Kommentare / Comments</h1><p class="ph-sub">{{ pending.count }} wag op goedkeuring / awaiting approval</p></div>
+  {% for comment in pending %}
+  <div class="comment-card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+      <div>
+        <div style="font-weight:500;color:var(--cream);font-size:14px;">{{ comment.author_name }} <span style="color:var(--muted2);font-size:12px;">&lt;{{ comment.author_email }}&gt;</span></div>
+        <div style="font-size:11.5px;color:var(--muted2);margin-top:2px;">Op: <a href="{{ comment.post.get_absolute_url }}" style="color:var(--gold);">{{ comment.post.title }}</a> · {{ comment.created_at|date:"d M Y H:i" }}</div>
+        <div style="font-size:13.5px;color:var(--muted);margin-top:10px;line-height:1.7;">{{ comment.body }}</div>
+      </div>
+      <form method="post" style="display:flex;flex-direction:column;gap:6px;margin-left:16px;flex-shrink:0;">
+        {% csrf_token %}
+        <input type="hidden" name="comment_id" value="{{ comment.pk }}">
+        <button name="action" value="approve" class="btn btn-primary btn-sm">✓ Keur goed</button>
+        <button name="action" value="delete" class="btn btn-danger btn-sm">✗ Verwyder</button>
+      </form>
+    </div>
+  </div>
+  {% empty %}
+  <div style="text-align:center;padding:60px 0;color:var(--muted);">
+    <p style="font-size:28px;margin-bottom:12px;">✓</p>
+    <p>Geen kommentare wag nie. / No comments pending.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,996 @@
+import json
+from datetime import datetime
+from django.shortcuts import render, get_object_or_404, redirect
+from django.db.models import Q
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth import login, logout
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import User
+from django.utils import timezone
+from django.http import HttpResponse, HttpResponseForbidden
+
+from .models import (Person, Relationship, Marriage, Document, Event,
+    UserProfile, AuditLog, PendingEdit)
+from .forms import (RegisterForm, PersonForm, ProposePersonForm,
+    RelationshipForm, MarriageForm, DocumentForm, EventForm,
+    SearchForm, GedcomImportForm)
+from .gedcom_dates import gedcom_to_display, calc_age, parse_gedcom_date
+
+
+# ─── Helpers ─────────────────────────────────────────────────────────────────
+
+def get_profile(user):
+    if not user.is_authenticated:
+        return None
+    profile, _ = UserProfile.objects.get_or_create(user=user, defaults={'role': 'pending'})
+    return profile
+
+
+def record_audit(user, action, obj, changes=None, note=''):
+    AuditLog.objects.create(
+        user=user, action=action,
+        model_name=obj.__class__.__name__,
+        object_id=obj.pk, object_repr=str(obj),
+        changes=changes or {}, note=note,
+    )
+
+def model_to_dict_simple(instance):
+    data = {}
+    for field in instance._meta.fields:
+        val = getattr(instance, field.name)
+        if hasattr(val, 'pk'):
+            val = str(val)
+        data[field.name] = val if val is not None else ''
+    return data
+
+def diff_dicts(old, new):
+    return {k: [old.get(k), new.get(k)] for k in new
+            if k not in ('created_at','updated_at','id') and old.get(k) != new.get(k)}
+
+# ─── Auth ─────────────────────────────────────────────────────────────────────
+
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('genealogy:dashboard')
+    form = AuthenticationForm(request, data=request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        login(request, form.get_user())
+        return redirect(request.GET.get('next', '/argief/'))
+    return render(request, 'genealogy/login.html', {'form': form})
+
+def logout_view(request):
+    logout(request)
+    return redirect('genealogy:person_list')
+
+def register_view(request):
+    if request.user.is_authenticated:
+        return redirect('genealogy:dashboard')
+    form = RegisterForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        user = form.save()
+        login(request, user)
+        messages.success(request,
+            'Welkom! U rekening wag op goedkeuring deur ʼn van Eeden-familiebeheerder. '
+            'U kan intussen in die argief blaai.')
+        return redirect('genealogy:person_list')
+    return render(request, 'genealogy/register.html', {'form': form})
+
+# ─── Dashboard ────────────────────────────────────────────────────────────────
+
+def dashboard(request):
+    profile = get_profile(request.user)
+    pending_count, pending_members, pending_edits = 0, [], []
+    if profile and profile.is_admin:
+        pending_count   = PendingEdit.objects.filter(status='pending').count()
+        pending_members = UserProfile.objects.filter(role='pending').select_related('user')
+        pending_edits   = PendingEdit.objects.filter(status='pending').select_related('proposed_by')[:10]
+    return render(request, 'genealogy/dashboard.html', {
+        'total_people':    Person.objects.count(),
+        'total_marriages': Marriage.objects.count(),
+        'total_documents': Document.objects.count(),
+        'recent_people':   Person.objects.order_by('-created_at')[:6],
+        'recent_audit':    AuditLog.objects.select_related('user')[:8],
+        'profile': profile, 'pending_count': pending_count,
+        'pending_members': pending_members, 'pending_edits': pending_edits,
+    })
+
+# ─── People ───────────────────────────────────────────────────────────────────
+
+def person_list(request):
+    profile = get_profile(request.user)
+    sort = request.GET.get('sort', 'name')
+    q = request.GET.get('q', '')
+    gender = request.GET.get('gender', '')
+    birth_from = request.GET.get('birth_from', '')
+    birth_to = request.GET.get('birth_to', '')
+
+    people = Person.objects.all()
+
+    if q:
+        people = people.filter(
+            models.Q(first_name__icontains=q) |
+            models.Q(last_name__icontains=q)  |
+            models.Q(birth_place__icontains=q)
+        )
+    if gender:
+        people = people.filter(gender=gender)
+    if birth_from:
+        people = people.filter(birth_date__gte=birth_from)
+    if birth_to:
+        people = people.filter(birth_date__lte=birth_to)
+
+    if sort == 'birth':
+        # Sort in Python since birth_date is a CharField with GEDCOM strings
+        people = sorted(people, key=lambda p: p.birth_year or 9999)
+    else:
+        people = people.order_by('last_name', 'first_name')
+
+    return render(request, 'genealogy/person_list.html', {
+        'people': people, 'profile': profile, 'sort': sort,
+        'q': q, 'gender': gender, 'birth_from': birth_from, 'birth_to': birth_to,
+    })
+
+
+def person_detail(request, pk):
+    profile  = get_profile(request.user)
+    person   = get_object_or_404(Person, pk=pk)
+    parents  = person.get_parents()
+    children = person.get_children()
+    siblings = person.get_siblings()
+    spouses  = person.get_spouses()
+
+    # Timeline — sort by year extracted from GEDCOM string
+    timeline = []
+    def tl_year(gedcom_str):
+        p = parse_gedcom_date(gedcom_str)
+        return p.get('year', 0) if p else 0
+
+    if person.birth_date:
+        timeline.append({'date': person.birth_date_display,
+            'year': tl_year(person.birth_date),
+            'label': 'Gebore', 'place': person.birth_place, 'type': 'birth'})
+    for sp in spouses:
+        m = sp['marriage']
+        if m.marriage_date:
+            timeline.append({'date': m.marriage_date_display,
+                'year': tl_year(m.marriage_date),
+                'label': f'Getroud met {sp["person"].full_name}',
+                'place': m.marriage_place, 'type': 'marriage'})
+        if m.end_date:
+            timeline.append({'date': m.end_date_display,
+                'year': tl_year(m.end_date),
+                'label': f'{m.get_status_display()} van {sp["person"].full_name}',
+                'place': m.end_place, 'type': 'marriage_end'})
+    for event in person.events.all():
+        if event.date:
+            timeline.append({'date': event.date_display,
+                'year': tl_year(event.date),
+                'label': event.title, 'place': event.place, 'type': 'event'})
+    if person.death_date:
+        timeline.append({'date': person.death_date_display,
+            'year': tl_year(person.death_date),
+            'label': 'Oorlede', 'place': person.death_place, 'type': 'death'})
+    timeline.sort(key=lambda x: x.get('year', 0))
+
+    audit_log = AuditLog.objects.filter(model_name='Person', object_id=pk).select_related('user')
+
+    return render(request, 'genealogy/person_detail.html', {
+        'person': person, 'parents': parents, 'children': children,
+        'siblings': siblings, 'spouses': spouses,
+        'timeline': timeline, 'audit_log': audit_log, 'profile': profile,
+    })
+
+
+@login_required
+def person_create(request):
+    profile = get_profile(request.user)
+    if not profile.is_approved:
+        messages.error(request, 'U rekening wag op goedkeuring.')
+        return redirect('genealogy:person_list')
+    if profile.can_edit:
+        if request.method == 'POST':
+            form = PersonForm(request.POST, request.FILES)
+            if form.is_valid():
+                person = form.save(commit=False)
+                person.created_by = request.user
+                person.save()
+                record_audit(request.user, 'create', person, note=request.POST.get('note',''))
+                messages.success(request, f'{person.full_name} is by die argief gevoeg.')
+                return redirect('genealogy:person_detail', pk=person.pk)
+        else:
+            form = PersonForm()
+        return render(request, 'genealogy/person_form.html',
+            {'form': form, 'title': 'Voeg persoon by', 'live': True, 'profile': profile})
+    else:
+        if request.method == 'POST':
+            form = ProposePersonForm(request.POST)
+            if form.is_valid():
+                data = {k: str(v) if v else '' for k, v in form.cleaned_data.items() if k != 'note'}
+                PendingEdit.objects.create(
+                    proposed_by=request.user, action='create', model_name='Person',
+                    object_repr=f"{form.cleaned_data['first_name']} {form.cleaned_data['last_name']}",
+                    proposed_data=data, note=form.cleaned_data.get('note',''),
+                )
+                messages.success(request, 'U voorstel is ingedien en wag op hersiening. Dankie!')
+                return redirect('genealogy:person_list')
+        else:
+            form = ProposePersonForm()
+        return render(request, 'genealogy/person_form.html',
+            {'form': form, 'title': 'Stel persoon voor', 'live': False, 'profile': profile})
+
+
+@login_required
+def person_edit(request, pk):
+    profile = get_profile(request.user)
+    person  = get_object_or_404(Person, pk=pk)
+    if not profile.is_approved:
+        messages.error(request, 'U rekening wag op goedkeuring.')
+        return redirect('genealogy:person_detail', pk=pk)
+    if profile.can_edit:
+        old_data = model_to_dict_simple(person)
+        if request.method == 'POST':
+            form = PersonForm(request.POST, request.FILES, instance=person)
+            if form.is_valid():
+                updated = form.save()
+                record_audit(request.user, 'update', updated,
+                    diff_dicts(old_data, model_to_dict_simple(updated)),
+                    note=request.POST.get('note',''))
+                messages.success(request, f'{person.full_name} is opgedateer.')
+                return redirect('genealogy:person_detail', pk=pk)
+        else:
+            form = PersonForm(instance=person)
+        return render(request, 'genealogy/person_form.html',
+            {'form': form, 'title': 'Wysig persoon', 'person': person,
+            'live': True, 'profile': profile})
+    else:
+        old_data = model_to_dict_simple(person)
+        if request.method == 'POST':
+            form = ProposePersonForm(request.POST)
+            if form.is_valid():
+                new_data = {k: str(v) if v else '' for k, v in form.cleaned_data.items() if k != 'note'}
+                PendingEdit.objects.create(
+                    proposed_by=request.user, action='update', model_name='Person',
+                    object_id=person.pk, object_repr=str(person),
+                    proposed_data=new_data, field_changes=diff_dicts(old_data, new_data),
+                    note=form.cleaned_data.get('note',''),
+                )
+                messages.success(request, 'U voorgestelde wysiging is ingedien vir hersiening.')
+                return redirect('genealogy:person_detail', pk=pk)
+        else:
+            form = ProposePersonForm(instance=person)
+        return render(request, 'genealogy/person_form.html',
+            {'form': form, 'title': 'Stel wysiging voor', 'person': person,
+            'live': False, 'profile': profile})
+
+
+@login_required
+def person_delete(request, pk):
+    profile = get_profile(request.user)
+    if not profile.can_delete:
+        return HttpResponseForbidden('Slegs beheerders kan rekords verwyder.')
+    person = get_object_or_404(Person, pk=pk)
+    if request.method == 'POST':
+        name = person.full_name
+        record_audit(request.user, 'delete', person)
+        person.delete()
+        messages.success(request, f'{name} is uit die argief verwyder.')
+        return redirect('genealogy:person_list')
+    return render(request, 'genealogy/person_confirm_delete.html', {'person': person})
+
+
+# ─── Admin: members ───────────────────────────────────────────────────────────
+
+@login_required
+def approve_member(request, user_id):
+    profile = get_profile(request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden()
+    tp = get_object_or_404(UserProfile, user_id=user_id)
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'approve':
+            tp.role = 'viewer'; tp.approved_by = request.user; tp.approved_at = timezone.now(); tp.save()
+            messages.success(request, f'{tp.user.username} is as kyker goedgekeur.')
+        elif action == 'trust':
+            tp.role = 'trusted'; tp.approved_by = request.user; tp.approved_at = timezone.now(); tp.save()
+            messages.success(request, f'{tp.user.username} is as vertroude lid aangewys.')
+        elif action == 'reject':
+            tp.role = 'pending'; tp.save()
+            messages.warning(request, f'{tp.user.username} bly hangend.')
+    return redirect('genealogy:dashboard')
+
+@login_required
+def member_edit(request, user_id):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+    profile = get_profile(request.user)
+    tp = get_object_or_404(UserProfile, user_id=user_id)
+    if request.method == 'POST':
+        # User fields
+        tp.user.first_name = request.POST.get('first_name', '').strip()
+        tp.user.last_name  = request.POST.get('last_name', '').strip()
+        tp.user.email      = request.POST.get('email', '').strip()
+        tp.user.save()
+        # Profile fields
+        tp.role = request.POST.get('role', tp.role)
+        tp.bio  = request.POST.get('bio', '').strip()
+        if tp.role != 'pending' and not tp.approved_at:
+            tp.approved_by = request.user
+            tp.approved_at = timezone.now()
+        tp.save()
+        messages.success(request, f'{tp.user.username} se profiel is opgedateer.')
+        return redirect('genealogy:members_list')
+    return render(request, 'genealogy/member_edit.html', {'tp': tp, 'profile': profile,
+        'role_choices': UserProfile.ROLE_CHOICES})
+
+
+@login_required
+def member_delete(request, user_id):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+    profile = get_profile(request.user)
+    tp = get_object_or_404(UserProfile, user_id=user_id)
+    if tp.user == request.user:
+        messages.error(request, 'Jy kan nie jou eie rekening verwyder nie.')
+        return redirect('genealogy:members_list')
+    if request.method == 'POST':
+        username = tp.user.username
+        tp.user.delete()  # cascades to UserProfile
+        messages.success(request, f'{username} is verwyder.')
+        return redirect('genealogy:members_list')
+    return render(request, 'genealogy/member_confirm_delete.html',
+        {'tp': tp, 'profile': profile})
+
+
+@login_required
+def members_list(request):
+    if not request.user.is_superuser:
+        return HttpResponseForbidden()
+    profile = get_profile(request.user)
+    members = UserProfile.objects.select_related('user','approved_by').order_by('role','joined')
+    return render(request, 'genealogy/members_list.html', {'members': members, 'profile': profile})
+
+
+# ─── Admin: pending edits ─────────────────────────────────────────────────────
+
+@login_required
+def pending_edits(request):
+    profile = get_profile(request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden()
+    edits = PendingEdit.objects.filter(status='pending').select_related('proposed_by')
+    return render(request, 'genealogy/pending_edits.html', {'edits': edits, 'profile': profile})
+
+
+@login_required
+def review_edit(request, edit_id):
+    profile = get_profile(request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden()
+    edit = get_object_or_404(PendingEdit, pk=edit_id)
+    if request.method == 'POST':
+        action      = request.POST.get('action')
+        review_note = request.POST.get('review_note','')
+        edit.reviewed_by = request.user
+        edit.reviewed_at = timezone.now()
+        edit.review_note = review_note
+        if action == 'approve':
+            edit.status = 'approved'; edit.save()
+            if edit.model_name == 'Person':
+                if edit.action == 'create':    _apply_person_create(edit, request.user)
+                elif edit.action == 'update':  _apply_person_update(edit, request.user)
+            messages.success(request, f'Wysiging goedgekeur en toegepas: {edit.object_repr}')
+        elif action == 'reject':
+            edit.status = 'rejected'; edit.save()
+            messages.warning(request, f'Wysiging verwerp: {edit.object_repr}')
+        return redirect('genealogy:pending_edits')
+    existing = None
+    if edit.object_id and edit.model_name == 'Person':
+        try: existing = Person.objects.get(pk=edit.object_id)
+        except Person.DoesNotExist: pass
+    return render(request, 'genealogy/review_edit.html', {
+        'edit': edit, 'existing': existing, 'profile': profile
+    })
+
+
+def _apply_person_create(edit, admin_user):
+    d = edit.proposed_data
+    p = Person.objects.create(
+        first_name=d.get('first_name',''), middle_name=d.get('middle_name',''),
+        last_name=d.get('last_name',''), maiden_name=d.get('maiden_name',''),
+        gender=d.get('gender','U'),
+        birth_date=d.get('birth_date',''), birth_place=d.get('birth_place',''),
+        death_date=d.get('death_date',''), death_place=d.get('death_place',''),
+        biography=d.get('biography',''), notes=d.get('notes',''),
+        is_deceased=d.get('is_deceased','') in ('True','true',True),
+        created_by=edit.proposed_by,
+    )
+    AuditLog.objects.create(user=admin_user, action='create', model_name='Person',
+        object_id=p.pk, object_repr=str(p),
+        note=f'Goedgekeur van voorstel deur {edit.proposed_by.username}')
+
+
+def _apply_person_update(edit, admin_user):
+    try: person = Person.objects.get(pk=edit.object_id)
+    except Person.DoesNotExist: return
+    old = model_to_dict_simple(person)
+    d = edit.proposed_data
+    for f in ['first_name','middle_name','last_name','maiden_name','gender',
+        'birth_place','death_place','biography','notes','birth_date','death_date']:
+        if f in d: setattr(person, f, d[f])
+    if 'is_deceased' in d:
+        person.is_deceased = d['is_deceased'] in ('True','true',True)
+    person.save()
+    AuditLog.objects.create(user=admin_user, action='update', model_name='Person',
+        object_id=person.pk, object_repr=str(person),
+        changes=diff_dicts(old, model_to_dict_simple(person)),
+        note=f'Goedgekeur van voorstel deur {edit.proposed_by.username}')
+
+
+# ─── Audit ────────────────────────────────────────────────────────────────────
+
+def audit_log(request):
+    profile = get_profile(request.user)
+    logs = AuditLog.objects.select_related('user').all()
+    return render(request, 'genealogy/audit_log.html', {'logs': logs, 'profile': profile})
+
+
+# ─── Marriages ────────────────────────────────────────────────────────────────
+
+def marriage_list(request):
+    profile   = get_profile(request.user)
+    marriages = Marriage.objects.select_related('person1','person2').all()
+    return render(request, 'genealogy/marriage_list.html', {'marriages': marriages, 'profile': profile})
+
+
+@login_required
+def marriage_create(request):
+    profile = get_profile(request.user)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan huwelike direk byvoeg.')
+        return redirect('genealogy:marriage_list')
+    if request.method == 'POST':
+        form = MarriageForm(request.POST, request.FILES)
+        if form.is_valid():
+            m = form.save()
+            _create_marriage_document(request, m)
+            record_audit(request.user, 'create', m, note=request.POST.get('note',''))
+            messages.success(request, 'Huwelik aangeteken.')
+            return redirect('genealogy:marriage_detail', pk=m.pk)
+    else:
+        form = MarriageForm()
+    return render(request, 'genealogy/marriage_form.html',
+        {'form': form, 'title': 'Teken huwelik aan', 'profile': profile,
+        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+
+
+@login_required
+def marriage_edit(request, pk):
+    profile  = get_profile(request.user)
+    marriage = get_object_or_404(Marriage, pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan huwelike wysig.')
+        return redirect('genealogy:marriage_detail', pk=pk)
+    old = model_to_dict_simple(marriage)
+    if request.method == 'POST':
+        form = MarriageForm(request.POST, request.FILES, instance=marriage)
+        if form.is_valid():
+            updated = form.save()
+            _create_marriage_document(request, updated)
+            record_audit(request.user, 'update', updated,
+                diff_dicts(old, model_to_dict_simple(updated)),
+                note=request.POST.get('note',''))
+            messages.success(request, 'Huwelik opgedateer.')
+            return redirect('genealogy:marriage_detail', pk=pk)
+    else:
+        form = MarriageForm(instance=marriage)
+    return render(request, 'genealogy/marriage_form.html',
+        {'form': form, 'title': 'Wysig huwelik', 'profile': profile,
+        'marriage': marriage,
+        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+
+
+def marriage_detail(request, pk):
+    profile  = get_profile(request.user)
+    marriage = get_object_or_404(Marriage, pk=pk)
+    # Documents linked to either person in the marriage
+    docs = Document.objects.filter(people__in=[marriage.person1, marriage.person2]).distinct()
+    return render(request, 'genealogy/marriage_detail.html',
+        {'marriage': marriage, 'documents': docs, 'profile': profile})
+
+
+@login_required
+def marriage_delete(request, pk):
+    profile  = get_profile(request.user)
+    marriage = get_object_or_404(Marriage, pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan huwelike verwyder.')
+        return redirect('genealogy:marriage_detail', pk=pk)
+    if request.method == 'POST':
+        record_audit(request.user, 'delete', marriage)
+        marriage.delete()
+        messages.success(request, 'Huwelik verwyder.')
+        return redirect('genealogy:marriage_list')
+    return render(request, 'genealogy/marriage_confirm_delete.html',
+        {'marriage': marriage, 'profile': profile})
+
+
+# ─── Relationships ────────────────────────────────────────────────────────────
+
+def relationship_list(request):
+    profile = get_profile(request.user)
+    relationships = Relationship.objects.all()
+    return render(request, 'genealogy/relationship_list.html', {'relationships': relationships, 'profile': profile})
+
+def relationship_detail(request, pk):
+    profile      = get_profile(request.user)
+    relationship = get_object_or_404(Relationship, pk=pk)
+    # Documents linked to the child (relative) for adoptions/guardianships
+    docs = Document.objects.filter(people=relationship.relative).distinct()
+    return render(request, 'genealogy/relationship_detail.html',
+        {'relationship': relationship, 'documents': docs, 'profile': profile})
+
+
+@login_required
+def relationship_create(request):
+    profile = get_profile(request.user)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan verhoudings byvoeg.')
+        return redirect('genealogy:person_list')
+    if request.method == 'POST':
+        form = RelationshipForm(request.POST, request.FILES)
+        if form.is_valid():
+            rel = form.save()
+            _create_relationship_document(request, rel)
+            record_audit(request.user, 'create', rel)
+            messages.success(request, 'Verhouding bygevoeg.')
+            return redirect('genealogy:relationship_detail', pk=rel.pk)
+    else:
+        form = RelationshipForm()
+    return render(request, 'genealogy/relationship_form.html', {'form': form, 'profile': profile,
+        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+
+@login_required
+def relationship_edit(request, pk):
+    profile = get_profile(request.user)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan verhoudings wysig.')
+        return redirect('genealogy:person_list')
+    relationship = get_object_or_404(Relationship, pk=pk)
+    if request.method == 'POST':
+        form = RelationshipForm(request.POST, request.FILES, instance=relationship)
+        if form.is_valid():
+            updated = form.save()
+            _create_relationship_document(request, updated)
+            record_audit(request.user, 'update', updated,
+                diff_dicts(model_to_dict_simple(relationship), model_to_dict_simple(updated)),
+                note=request.POST.get('note',''))
+            messages.success(request, 'Verhouding opgedateer.')
+            return redirect('genealogy:relationship_detail', pk=pk)
+    else:
+        form = RelationshipForm(instance=relationship)
+    return render(request, 'genealogy/relationship_form.html', {'form': form, 'profile': profile,
+        'relationship': relationship,
+        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+
+def relationship_delete(request, pk):
+    profile = get_profile(request.user)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan verhoudings verwyder.')
+        return redirect('genealogy:person_list')
+    relationship = get_object_or_404(Relationship, pk=pk)
+    if request.method == 'POST':
+        relationship.delete()
+        record_audit(request.user, 'delete', relationship)
+        messages.success(request, 'Verhouding verwyder.')
+        return redirect('genealogy:relationship_list')
+    return render(request, 'genealogy/relationship_confirm_delete.html', {'relationship': relationship, 'profile': profile})
+
+
+
+# ─── Documents ────────────────────────────────────────────────────────────────
+
+def document_list(request):
+    profile   = get_profile(request.user)
+    documents = Document.objects.all()
+    return render(request, 'genealogy/document_list.html', {'documents': documents, 'profile': profile})
+
+
+def document_detail(request, pk):
+    profile  = get_profile(request.user)
+    document = get_object_or_404(Document, pk=pk)
+    return render(request, 'genealogy/document_detail.html', {'document': document, 'profile': profile})
+
+
+@login_required
+def document_create(request):
+    profile = get_profile(request.user)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan dokumente oplaai.')
+        return redirect('genealogy:document_list')
+    if request.method == 'POST':
+        form = DocumentForm(request.POST, request.FILES)
+        if form.is_valid():
+            doc = form.save(commit=False)
+            doc.uploaded_by = request.user
+            doc.save(); form.save_m2m()
+            record_audit(request.user, 'create', doc)
+            messages.success(request, 'Dokument gevoeg.')
+            return redirect('genealogy:document_list')
+    else:
+        form = DocumentForm()
+    return render(request, 'genealogy/document_form.html',
+        {'form': form, 'title': 'Voeg dokument by', 'profile': profile, 'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+
+@login_required
+def document_edit(request, pk):
+    profile  = get_profile(request.user)
+    document = get_object_or_404(Document, pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan dokumente wysig.')
+        return redirect('genealogy:document_detail', pk=pk)
+    if request.method == 'POST':
+        form = DocumentForm(request.POST, request.FILES, instance=document)
+        if form.is_valid():
+            doc = form.save(commit=False)
+            doc.save(); form.save_m2m()
+            record_audit(request.user, 'update', doc)
+            messages.success(request, 'Dokument gewysig.')
+            return redirect('genealogy:document_detail', pk=pk)
+    else:
+        form = DocumentForm(instance=document)
+    return render(request, 'genealogy/document_form.html',
+        {'form': form, 'title': 'Wysig dokument', 'profile': profile,
+        'all_people': Person.objects.all().order_by('last_name', 'first_name'),
+        'document': document})
+
+@login_required
+def document_delete(request, pk):
+    profile  = get_profile(request.user)
+    document = get_object_or_404(Document, pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan dokumente verwyder.')
+        return redirect('genealogy:document_detail', pk=pk)
+    if request.method == 'POST':
+        record_audit(request.user, 'delete', document)
+        document.delete()
+        messages.success(request, 'Dokument verwyder.')
+        return redirect('genealogy:document_list')
+    return render(request, 'genealogy/document_confirm_delete.html',
+        {'document': document, 'profile': profile})
+
+
+# ─── Events ───────────────────────────────────────────────────────────────────
+
+def event_list(request):
+    profile = get_profile(request.user)
+    events  = Event.objects.all()
+    return render(request, 'genealogy/event_list.html', {'events': events, 'profile': profile})
+
+
+@login_required
+def event_create(request):
+    profile = get_profile(request.user)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan gebeure byvoeg.')
+        return redirect('genealogy:event_list')
+    if request.method == 'POST':
+        form = EventForm(request.POST, request.FILES)
+        if form.is_valid():
+            event = form.save()
+            event.people.set(event.people.all())  # ensure M2M saved
+            _create_event_document(request, event)
+            record_audit(request.user, 'create', event)
+            messages.success(request, 'Gebeurtenis gevoeg.')
+            return redirect('genealogy:event_detail', pk=event.pk)
+    else:
+        form = EventForm()
+    return render(request, 'genealogy/event_form.html',
+        {'form': form, 'title': 'Voeg gebeurtenis by', 'profile': profile, 'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+
+def event_detail(request, pk):
+    profile = get_profile(request.user)
+    event   = get_object_or_404(Event, pk=pk)
+    return render(request, 'genealogy/event_detail.html',
+        {'event': event, 'profile': profile})
+
+@login_required
+def event_edit(request, pk):
+    profile = get_profile(request.user)
+    event   = get_object_or_404(Event, pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan gebeure wysig.')
+        return redirect('genealogy:event_detail', pk=pk)
+    if request.method == 'POST':
+        form = EventForm(request.POST, request.FILES, instance=event)
+        if form.is_valid():
+            event = form.save()
+            _create_event_document(request, event)
+            record_audit(request.user, 'update', event)
+            messages.success(request, 'Gebeurtenis gewysig.')
+            return redirect('genealogy:event_detail', pk=pk)
+    else:
+        form = EventForm(instance=event)
+    return render(request, 'genealogy/event_form.html',
+        {'form': form, 'title': 'Wysig gebeurtenis', 'profile': profile,
+        'all_people': Person.objects.all().order_by('last_name', 'first_name'),
+        'event': event})
+
+@login_required
+def event_delete(request, pk):
+    profile = get_profile(request.user)
+    event   = get_object_or_404(Event, pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan gebeure verwyder.')
+        return redirect('genealogy:event_detail', pk=pk)
+    if request.method == 'POST':
+        record_audit(request.user, 'delete', event)
+        event.delete()
+        messages.success(request, 'Gebeurtenis verwyder.')
+        return redirect('genealogy:event_list')
+    return render(request, 'genealogy/event_confirm_delete.html',
+        {'event': event, 'profile': profile})
+
+# ─── Family tree ──────────────────────────────────────────────────────────────
+
+def family_tree_data(request, pk):
+    profile = get_profile(request.user)
+    person  = get_object_or_404(Person, pk=pk)
+
+    def build_node(p, depth=0, max_depth=4, visited=None):
+        if visited is None: visited = set()
+        if p.pk in visited or depth > max_depth: return None
+        visited.add(p.pk)
+        node = {
+            'id': p.pk, 'name': p.full_name, 'gender': p.gender,
+            'birth_year': p.birth_year, 'death_year': p.death_year,
+            'url': p.get_absolute_url(), 'children': [],
+        }
+        for child in p.get_children():
+            cn = build_node(child, depth+1, max_depth, visited)
+            if cn: node['children'].append(cn)
+        return node
+
+    return render(request, 'genealogy/family_tree.html', {
+        'person': person,
+        'tree_json': json.dumps(build_node(person)),
+        'profile': profile,
+    })
+
+
+# ─── Map ──────────────────────────────────────────────────────────────────────
+
+def map_view(request):
+    profile = get_profile(request.user)
+    people  = Person.objects.exclude(Q(birth_place='') & Q(death_place=''))
+    people_data = [{
+        'id': p.pk, 'name': p.full_name, 'url': p.get_absolute_url(),
+        'birth_place': p.birth_place, 'death_place': p.death_place,
+        'birth_year': p.birth_year, 'death_year': p.death_year,
+        'birth_lat': p.birth_lat, 'birth_lng': p.birth_lng,
+        'death_lat': p.death_lat, 'death_lng': p.death_lng,
+    } for p in people]
+    return render(request, 'genealogy/map.html', {
+        'people_json': json.dumps(people_data),
+        'people_count': len(people_data), 'profile': profile,
+    })
+
+
+# ─── GEDCOM export ────────────────────────────────────────────────────────────
+
+def export_gedcom(request):
+    lines = ['0 HEAD', '1 GEDC', '2 VERS 5.5.1', '1 CHAR UTF-8',
+        '1 SOUR VanEedenArgief', '2 NAME Van Eeden Familieargief']
+    for p in Person.objects.all():
+        lines += [f'0 @I{p.pk}@ INDI',
+            f'1 NAME {p.first_name} /{p.last_name}/',
+            f'2 GIVN {p.first_name}', f'2 SURN {p.last_name}']
+        if p.gender in ('M','F'):
+            lines.append(f'1 SEX {p.gender}')
+        if p.birth_date or p.birth_place:
+            lines.append('1 BIRT')
+            if p.birth_date:  lines.append(f'2 DATE {p.birth_date}')
+            if p.birth_place: lines.append(f'2 PLAC {p.birth_place}')
+        if p.is_deceased or p.death_date:
+            lines.append('1 DEAT Y')
+            if p.death_date:  lines.append(f'2 DATE {p.death_date}')
+            if p.death_place: lines.append(f'2 PLAC {p.death_place}')
+        if p.biography:
+            lines.append(f'1 NOTE {p.biography[:248]}')
+    for m in Marriage.objects.all():
+        lines += [f'0 @F{m.pk}@ FAM',
+            f'1 HUSB @I{m.person1.pk}@',
+            f'1 WIFE @I{m.person2.pk}@']
+        if m.marriage_date:
+            lines += ['1 MARR', f'2 DATE {m.marriage_date}']
+        for child in m.person1.get_children():
+            lines.append(f'1 CHIL @I{child.pk}@')
+    lines.append('0 TRLR')
+    response = HttpResponse('\r\n'.join(lines), content_type='text/plain; charset=utf-8')
+    response['Content-Disposition'] = 'attachment; filename="van_eeden_familie.ged"'
+    return response
+
+
+# ─── GEDCOM import ────────────────────────────────────────────────────────────
+
+@login_required
+def import_gedcom(request):
+    profile = get_profile(request.user)
+    if not profile.is_admin:
+        return HttpResponseForbidden('Slegs beheerders kan GEDCOM-lêers invoer.')
+    if request.method == 'POST':
+        form = GedcomImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            import tempfile, os
+            from genealogy.management.commands.import_gedcom import (
+                parse_gedcom, extract_individuals, extract_families
+            )
+            uploaded = request.FILES['gedcom_file']
+            with tempfile.NamedTemporaryFile(delete=False, suffix='.ged') as tmp:
+                for chunk in uploaded.chunks(): tmp.write(chunk)
+                tmp_path = tmp.name
+            try:
+                records     = parse_gedcom(tmp_path)
+                individuals = extract_individuals(records)
+                families    = extract_families(records)
+                xref_to_pk  = {}
+                for xref, i in individuals.items():
+                    parts  = i['given'].split()
+                    first  = parts[0] if parts else 'Onbekend'
+                    middle = ' '.join(parts[1:]) if len(parts) > 1 else ''
+                    # Convert parsed dates back to GEDCOM strings
+                    bd = _date_to_gedcom(i.get('birth_date'), i.get('birth_modifier',''))
+                    dd = _date_to_gedcom(i.get('death_date'), i.get('death_modifier',''))
+                    person = Person.objects.create(
+                        first_name=first, middle_name=middle,
+                        last_name=i['surname'] or 'Onbekend',
+                        gender=i['sex'] if i['sex'] in ('M','F') else 'U',
+                        birth_date=bd, birth_place=i.get('birth_place',''),
+                        death_date=dd, death_place=i.get('death_place',''),
+                        is_deceased=i.get('is_deceased', False),
+                        notes=i.get('notes','').strip(),
+                        created_by=request.user,
+                    )
+                    xref_to_pk[xref] = person.pk
+                for fam in families:
+                    h = xref_to_pk.get(fam['husb'])
+                    w = xref_to_pk.get(fam['wife'])
+                    if h and w:
+                        md = _date_to_gedcom(fam.get('marr_date'), '')
+                        Marriage.objects.create(
+                            person1=Person.objects.get(pk=h),
+                            person2=Person.objects.get(pk=w),
+                            marriage_date=md,
+                            marriage_place=fam.get('marr_place',''),
+                        )
+                    parent_pk = h or w
+                    if parent_pk:
+                        parent = Person.objects.get(pk=parent_pk)
+                        for cxref in fam.get('children', []):
+                            cpk = xref_to_pk.get(cxref)
+                            if cpk:
+                                Relationship.objects.get_or_create(
+                                    person=parent,
+                                    relative=Person.objects.get(pk=cpk),
+                                    defaults={'relationship_type': 'parent'},
+                                )
+                messages.success(request, f'{len(individuals)} mense ingevoer uit {uploaded.name}.')
+                return redirect('genealogy:person_list')
+            except Exception as e:
+                messages.error(request, f'Invoer misluk: {e}')
+            finally:
+                os.unlink(tmp_path)
+    else:
+        form = GedcomImportForm()
+    return render(request, 'genealogy/import_gedcom.html', {'form': form, 'profile': profile})
+
+
+def _date_to_gedcom(date_obj, modifier):
+    """Convert a Python date object (from the GEDCOM importer) to a GEDCOM string."""
+    if not date_obj:
+        return ''
+    MONTHS_GED = ['JAN','FEB','MAR','APR','MAY','JUN',
+        'JUL','AUG','SEP','OCT','NOV','DEC']
+    try:
+        day = date_obj.day
+        month = MONTHS_GED[date_obj.month - 1]
+        year = date_obj.year
+        date_str = f'{day} {month} {year}'
+        if modifier and modifier.upper() in ('BEF','AFT','EST','ABT','CAL'):
+            return f'{modifier.upper()} {date_str}'
+        return date_str
+    except (AttributeError, IndexError):
+        return str(date_obj) if date_obj else ''
+
+
+# ─── Document auto-creation helpers ──────────────────────────────────────────
+
+EVENT_DOCTYPE_MAP = {
+    'birth':            'birth_certificate',
+    'death':            'death_certificate',
+    'baptism':          'baptism',
+    'immigration':      'immigration',
+    'emigration':       'emigration',
+    'military_service': 'military',
+    'graduation':       'graduation',
+    'marriage':         'marriage_certificate',
+    'other':            'other',
+}
+
+MARRIAGE_DOCTYPE_MAP = {
+    'married':  'marriage_certificate',
+    'divorced': 'divorce_paper',
+    'annulled': 'annulment_certificate',
+}
+
+RELATION_DOCTYPE_MAP = {
+    'adoptive_parent': 'adoption_paper',
+    'guardian':        'guardianship_paper',
+}
+
+
+def _create_marriage_document(request, marriage):
+    f = request.FILES.get('doc_file')
+    if not f:
+        return
+    folder   = Document.MARRIAGE_FOLDER_MAP.get(marriage.status)
+    if not folder:
+        return
+    doc_type = MARRIAGE_DOCTYPE_MAP.get(marriage.status, 'other')
+    title    = request.POST.get('doc_title') or \
+        f'{marriage.get_status_display()} — {marriage.person1.full_name} & {marriage.person2.full_name}'
+    doc = Document(
+        title=title,
+        document_type=doc_type,
+        description=request.POST.get('doc_description', ''),
+        uploaded_by=request.user,
+    )
+    doc.file.field.upload_to = f'documents/{folder}/'
+    doc.file = f
+    doc.save()
+    doc.people.set([marriage.person1, marriage.person2])
+
+
+def _create_event_document(request, event):
+    f = request.FILES.get('doc_file')
+    if not f:
+        return
+    first_person = event.people.first()
+    folder   = Document.EVENT_FOLDER_MAP.get(event.event_type, 'events/other')
+    doc_type = EVENT_DOCTYPE_MAP.get(event.event_type, 'other')
+    title    = request.POST.get('doc_title') or \
+        f'{event.get_event_type_display()} — {event.title}'
+    doc = Document(
+        title=title,
+        document_type=doc_type,
+        description=request.POST.get('doc_description', ''),
+        uploaded_by=request.user,
+    )
+    doc.file.field.upload_to = f'documents/{folder}/'
+    doc.file = f
+    doc.save()
+    if first_person:
+        doc.people.set([first_person])
+
+
+def _create_relationship_document(request, relationship):
+    f = request.FILES.get('doc_file')
+    if not f:
+        return
+    folder   = Document.RELATION_FOLDER_MAP.get(relationship.relationship_type)
+    if not folder:
+        return
+    doc_type = RELATION_DOCTYPE_MAP.get(relationship.relationship_type, 'other')
+    title    = request.POST.get('doc_title') or \
+        f'{relationship.get_relationship_type_display()} — {relationship.relative.full_name}'
+    doc = Document(
+        title=title,
+        document_type=doc_type,
+        description=request.POST.get('doc_description', ''),
+        uploaded_by=request.user,
+    )
+    doc.file.field.upload_to = f'documents/{folder}/'
+    doc.file = f
+    doc.save()
+    doc.people.set([relationship.relative])

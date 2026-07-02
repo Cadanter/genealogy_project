@@ -1,0 +1,21 @@
+{% extends "blog/base.html" %}
+{% block title %}Konsepte — Blog{% endblock %}
+{% block content %}
+<div style="max-width:800px;margin:0 auto;padding:36px 24px;">
+  <div class="ph"><h1>Konsepte / Drafts</h1><p class="ph-sub">{{ posts.count }} ongepubliseerde plasing{{ posts.count|pluralize:"s" }}</p></div>
+  {% for post in posts %}
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:18px 20px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div style="font-family:'EB Garamond',serif;font-size:18px;color:var(--cream);">{{ post.title }}</div>
+      <div style="font-size:11.5px;color:var(--muted2);margin-top:3px;">Geskep {{ post.created_at|date:"d M Y" }}</div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <a href="{% url 'blog:post_edit' post.slug %}" class="btn btn-secondary btn-sm">Wysig</a>
+      <a href="{% url 'blog:post_delete' post.slug %}" class="btn btn-danger btn-sm">✗</a>
+    </div>
+  </div>
+  {% empty %}
+  <p style="color:var(--muted);text-align:center;padding:40px 0;">Geen konsepte nie.</p>
+  {% endfor %}
+</div>
+{% endblock %}

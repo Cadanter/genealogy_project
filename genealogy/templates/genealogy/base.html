@@ -1,0 +1,121 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="af">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Van Eeden Familiegeskiedenis{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'genealogy/css/main.css' %}">
+  <link rel="icon" type="image/png" href="{% static 'core/img/logo.png' %}">
+  {% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<nav class="sidebar">
+  <div class="brand">
+    <div class="brand-title">Van Eeden<br>Familiegeskiedenis</div>
+    <div class="brand-sub">Ter nagedagtenis</div>
+  </div>
+
+  <div class="nav">
+    <div class="nav-label">Oorsig</div>
+    <a href="{% url 'genealogy:dashboard' %}" class="{% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+      <span class="ic">⌂</span> Tuiste
+    </a>
+    <a href="{% url 'genealogy:map' %}" class="{% if request.resolver_match.url_name == 'map' %}active{% endif %}">
+      <span class="ic">◎</span> Kaart
+    </a>
+    <a href="{% url 'genealogy:audit_log' %}" class="{% if request.resolver_match.url_name == 'audit_log' %}active{% endif %}">
+      <span class="ic">◷</span> Geskiedenis
+    </a>
+
+    <div class="nav-label">Rekords</div>
+    <a href="{% url 'genealogy:person_list' %}" class="{% if 'person' in request.resolver_match.url_name %}active{% endif %}">
+      <span class="ic">⊙</span> Mense
+    </a>
+    <a href="{% url 'genealogy:marriage_list' %}" class="{% if 'marriage' in request.resolver_match.url_name %}active{% endif %}">
+      <span class="ic">∞</span> Huwelike
+    </a>
+    <a href="{% url 'genealogy:relationship_list' %}" class="{% if 'relationship' in request.resolver_match.url_name %}active{% endif %}">
+      <span class="ic">↔</span> Verhoudings
+    </a>
+    <a href="{% url 'genealogy:event_list' %}" class="{% if 'event' in request.resolver_match.url_name %}active{% endif %}">
+      <span class="ic">◈</span> Gebeure
+    </a>
+    <a href="{% url 'genealogy:document_list' %}" class="{% if 'document' in request.resolver_match.url_name %}active{% endif %}">
+      <span class="ic">◻</span> Dokumente
+    </a>
+
+    {% if user.is_authenticated and profile %}
+      {% if profile.can_edit %}
+        <div class="nav-label">Voeg by</div>
+        <a href="{% url 'genealogy:person_create' %}"><span class="ic">+</span> Voeg persoon by</a>
+        <a href="{% url 'genealogy:relationship_create' %}"><span class="ic">↔</span> Voeg verhouding by</a>
+        <a href="{% url 'genealogy:marriage_create' %}"><span class="ic">+</span> Teken huwelik aan</a>
+      {% elif profile.is_approved %}
+        <div class="nav-label">Bydrae</div>
+        <a href="{% url 'genealogy:person_create' %}"><span class="ic">+</span> Stel persoon voor</a>
+        <a href="{% url 'genealogy:person_list' %}"><span class="ic">✎</span> Stel wysiging voor</a>
+      {% endif %}
+
+      {% if profile.is_admin %}
+        <div class="nav-label">Administrasie</div>
+        <a href="{% url 'genealogy:members_list' %}" class="{% if request.resolver_match.url_name == 'members_list' %}active{% endif %}">
+          <span class="ic">⊕</span> Lede
+        </a>
+        <a href="{% url 'genealogy:pending_edits' %}" class="{% if request.resolver_match.url_name == 'pending_edits' %}active{% endif %}">
+          <span class="ic">✓</span> Hersien wysigings
+          {% if pending_count %}<span class="nav-badge">{{ pending_count }}</span>{% endif %}
+        </a>
+        <a href="{% url 'genealogy:import_gedcom' %}"><span class="ic">↑</span> Voer GEDCOM in</a>
+      {% endif %}
+    {% endif %}
+
+    <div class="nav-label">Uitvoer</div>
+    <a href="{% url 'genealogy:export_gedcom' %}"><span class="ic">↓</span> Laai GEDCOM af</a>
+  </div>
+
+  <div class="sidebar-user">
+    <div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid rgba(255,255,255,.06);display:flex;gap:10px;">
+      <a href="/" style="color:rgba(247,243,236,.4);font-size:11px;text-decoration:none;">⌂ Voorblad</a>
+      <a href="{% url 'blog:post_list' %}" style="color:rgba(247,243,236,.4);font-size:11px;text-decoration:none;">✍ Blog</a>
+    </div>
+    {% if user.is_authenticated %}
+      <div class="uname">{{ user.get_full_name|default:user.username }}</div>
+      {% if profile %}<div class="urole">{{ profile.get_role_display }}</div>{% endif %}
+      <a href="{% url 'genealogy:logout' %}">Teken uit</a>
+    {% else %}
+      <a href="{% url 'genealogy:login' %}" style="color:rgba(247,243,236,.6)">Teken in</a>
+      &nbsp;·&nbsp;
+      <a href="{% url 'genealogy:register' %}" style="color:rgba(247,243,236,.6)">Registreer</a>
+    {% endif %}
+  </div>
+</nav>
+
+<div class="main">
+  <div class="topbar">
+    <div class="breadcrumb">
+      <a href="/" style="color: var(--muted); font-weight: 600; font-size: 0.9rem; padding-right: 10px;">Voorblad</a>
+      {% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a>{% endblock %}
+    </div>
+    <div class="topbar-right">{% block topbar_actions %}{% endblock %}</div>
+  </div>
+
+  <div class="content">
+    {% if messages %}
+      <div class="msgs">
+        {% for msg in messages %}
+          <div class="alert alert-{% if msg.tags == 'error' %}error{% elif msg.tags == 'warning' %}warning{% else %}success{% endif %}">
+            {{ msg }}
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+
+</body>
+</html>

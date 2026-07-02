@@ -1,0 +1,66 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Mense — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Mense{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.is_approved %}
+    <a href="{% url 'genealogy:person_create' %}" class="btn btn-primary btn-sm">
+      {% if profile.can_edit %}+ Voeg persoon by{% else %}+ Stel persoon voor{% endif %}
+    </a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="ph">
+  <div>
+    <h2>Mense</h2>
+    <p class="subtitle">{{ people.count }} rekord{{ people.count|pluralize:"s" }} in die argief</p>
+  </div>
+</div>
+
+<div class="card">
+  <form method="get" class="search-bar">
+    {{ form.query }}{{ form.gender }}{{ form.birth_year_from }}{{ form.birth_year_to }}
+    <button type="submit" class="btn btn-primary btn-sm">Soek</button>
+    {% if request.GET %}<a href="{% url 'genealogy:person_list' %}" class="btn btn-secondary btn-sm">Wis uit</a>{% endif %}
+  </form>
+</div>
+
+{% if people %}
+<!-- Sort controls -->
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+  <span style="font-size:13px;color:var(--muted);">Sorteer:</span>
+  <a href="?q={{ q }}&gender={{ gender }}&birth_from={{ birth_from }}&birth_to={{ birth_to }}&sort=name"
+     class="btn btn-sm {% if sort == 'name' %}btn-primary{% else %}btn-secondary{% endif %}">
+    A – Z
+  </a>
+  <a href="?q={{ q }}&gender={{ gender }}&birth_from={{ birth_from }}&birth_to={{ birth_to }}&sort=birth"
+     class="btn btn-sm {% if sort == 'birth' %}btn-primary{% else %}btn-secondary{% endif %}">
+    Geboortejaar
+  </a>
+</div>
+<div class="person-grid">
+  {% for p in people %}
+  <a href="{{ p.get_absolute_url }}" class="pcard">
+    <div class="pcard-name">{{ p.full_name }}</div>
+    <div class="pcard-dates">
+      {% if p.birth_date %}geb. {{ p.birth_year }}{% endif %}
+      {% if p.is_deceased and p.death_date %} – gest. {{ p.death_year }}{% endif %}
+    </div>
+    {% if p.birth_place %}<div style="font-size:11.5px;color:var(--muted);">{{ p.birth_place }}</div>{% endif %}
+    <span class="badge badge-{% if p.gender == 'M' %}male{% elif p.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;align-self:flex-start;">
+      {{ p.get_gender_display }}
+    </span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card" style="text-align:center;padding:48px;">
+  <p style="font-size:28px;margin-bottom:10px;">⊙</p>
+  <p style="color:var(--muted);">Geen mense gevind nie.
+    {% if profile and profile.is_approved %}
+      <a href="{% url 'genealogy:person_create' %}" style="color:var(--sepia);">Voeg die eerste een by.</a>
+    {% endif %}
+  </p>
+</div>
+{% endif %}
+{% endblock %}

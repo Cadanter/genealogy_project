@@ -1,0 +1,30 @@
+{% extends "genealogy/base.html" %}
+{% block title %}{{ title }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:document_list' %}">Dokumente</a> <span>›</span> {{ title }}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>{{ title }}</h2></div></div>
+<div class="card" style="max-width:640px;">
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+  {% for field in form %}
+    {% if field.name == 'people' %}
+    {% else %}
+    <div class="fg" style="margin-bottom:14px;">
+      <label>{{ field.label }}</label>{{ field }}
+      {% if field.errors %}<small style="color:var(--rust)">{{ field.errors|join:", " }}</small>{% endif %}
+    </div>
+    {% endif %}
+  {% endfor %}
+
+  {% include "genealogy/_people_picker.html" with selected_people=document.people.values_list %}
+
+  <div class="form-actions">
+    <button type="submit" class="btn btn-primary">💾 Stoor</button>
+    <a href="{% url 'genealogy:document_list' %}" class="btn btn-secondary">Kanselleer</a>
+  </div>
+</form>
+</div>
+{% endblock %}

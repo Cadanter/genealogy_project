@@ -1,0 +1,30 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Voer GEDCOM in — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Voer GEDCOM in{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Voer GEDCOM in</h2><p class="subtitle">Laai 'n .ged-lêer op om familierekords in groot maat in te voer.</p></div></div>
+<div class="card" style="max-width:540px;">
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    <div class="fg" style="margin-bottom:18px;">
+      <label>GEDCOM-lêer (.ged)</label>
+      {{ form.gedcom_file }}
+      <small style="color:var(--muted);font-size:12px;margin-top:4px;">
+        Versoenbaar met Ancestry, FamilySearch, Gramps, MacFamilyTree en die meeste genealogie-toepassings.
+      </small>
+    </div>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">↑ Voer in</button>
+      <a href="{% url 'genealogy:dashboard' %}" class="btn btn-secondary">Kanselleer</a>
+    </div>
+  </form>
+</div>
+<div class="card" style="max-width:540px;background:#fffbeb;border-color:#e8d99a;">
+  <h3 style="font-size:15px;margin-bottom:8px;">⚠️ Voor u invoer</h3>
+  <ul style="font-size:13px;color:var(--muted);line-height:1.9;padding-left:18px;">
+    <li>Alle ingevoerde rekords word by die gedeelde argief gevoeg.</li>
+    <li>Bestaande rekords word nie gewysig nie.</li>
+    <li>Groot lêers kan 'n oomblik neem.</li>
+    <li>Opdragreël-alternatief: <code style="background:#f0ebe0;padding:2px 6px;border-radius:3px;font-size:11.5px;">python manage.py import_gedcom lêer.ged --user=gebruikersnaam</code></li>
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,162 @@
+{% extends "blog/base.html" %}
+{% block title %}{{ post.display_title }} — Danie van Eeden{% endblock %}
+
+{% block content %}
+<div class="outer">
+  <div class="main-col">
+
+    <div class="breadcrumb">
+      <a href="{% url 'blog:post_list' %}">Blog</a>
+      {% if post.category %}<span>›</span><a href="{{ post.category.get_absolute_url }}">{{ post.category.name_af|default:post.category.name }}</a>{% endif %}
+      <span>›</span> {{ post.display_title|truncatechars:40 }}
+    </div>
+
+    <div class="post-header">
+      <h1 class="post-title">{{ post.title }}</h1>
+      {% if post.title_af and post.title_af != post.title %}
+        <div class="post-title-af">{{ post.title_af }}</div>
+      {% endif %}
+      <div class="post-meta">
+        <span>{{ post.published_at|date:"d M Y" }}</span>
+        {% if post.author %}<span>{{ post.author.get_full_name|default:post.author.username }}</span>{% endif %}
+        {% if post.category %}<span class="cat"><a href="{{ post.category.get_absolute_url }}">{{ post.category.name_af|default:post.category.name }}</a></span>{% endif %}
+        <span>{{ post.comment_count }} kommentare</span>
+      </div>
+
+      {% if post.tags.exists %}
+      <div class="tag-list" style="margin-bottom:20px;">
+        {% for tag in post.tags.all %}
+          <a href="{{ tag.get_absolute_url }}" class="tag"># {{ tag.name }}</a>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if user.is_staff %}
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <a href="{% url 'blog:post_edit' post.slug %}" class="btn btn-secondary btn-sm">✎ Wysig</a>
+        <a href="{% url 'blog:post_delete' post.slug %}" class="btn btn-danger btn-sm">✗ Verwyder</a>
+      </div>
+      {% endif %}
+    </div>
+
+    {% if post.cover_image %}
+      <img src="{{ post.cover_image.url }}" class="post-cover" alt="{{ post.title }}">
+    {% endif %}
+
+    <!-- Language toggle — only shown if both languages present -->
+    {% if post.body_af %}
+    <div class="lang-toggle">
+      <button class="lang-btn active" onclick="showLang('af', this)">Afrikaans</button>
+      <button class="lang-btn" onclick="showLang('en', this)">English</button>
+    </div>
+    {% endif %}
+
+    <div class="post-body" id="body-af">
+      {{ post.body_af|default:post.body|linebreaksbr }}
+    </div>
+    {% if post.body_af %}
+    <div class="post-body" id="body-en" style="display:none;">
+      {{ post.body|linebreaksbr }}
+    </div>
+    {% endif %}
+
+    <hr class="divider">
+
+    <!-- Related posts -->
+    {% if related %}
+    <div class="related" style="margin-bottom:36px;">
+      <h3>Verwante plasings / Related posts</h3>
+      {% for r in related %}
+      <a href="{{ r.get_absolute_url }}" class="related-item">
+        <strong>{{ r.display_title }}</strong>
+        {{ r.display_excerpt|truncatewords:18 }}
+      </a>
+      {% endfor %}
+    </div>
+    <hr class="divider">
+    {% endif %}
+
+    <!-- Comments -->
+    <div class="comments-section">
+      <h2>{{ comments.count }} Kommentare / Comments</h2>
+
+      {% for comment in comments %}
+      <div class="comment">
+        <div class="comment-author">{{ comment.author_name }}</div>
+        <div class="comment-date">{{ comment.created_at|date:"d M Y · H:i" }}</div>
+        <div class="comment-body">{{ comment.body|linebreaksbr }}</div>
+      </div>
+      {% empty %}
+      <p style="color:var(--muted);font-size:13px;margin-bottom:24px;">Nog geen kommentare nie. Wees die eerste! / No comments yet. Be the first!</p>
+      {% endfor %}
+
+      <div class="comment-form">
+        <h3>Laat 'n kommentaar / Leave a comment</h3>
+        <form method="post">
+          {% csrf_token %}
+          <div class="form-grid">
+            <div class="fg">
+              <label>{{ form.author_name.label }}</label>
+              {{ form.author_name }}
+              {% if form.author_name.errors %}<small style="color:var(--rust)">{{ form.author_name.errors|join:", " }}</small>{% endif %}
+            </div>
+            <div class="fg">
+              <label>{{ form.author_email.label }}</label>
+              {{ form.author_email }}
+              {% if form.author_email.errors %}<small style="color:var(--rust)">{{ form.author_email.errors|join:", " }}</small>{% endif %}
+            </div>
+          </div>
+          <div class="fg">
+            <label>{{ form.body.label }}</label>
+            {{ form.body }}
+            {% if form.body.errors %}<small style="color:var(--rust)">{{ form.body.errors|join:", " }}</small>{% endif %}
+          </div>
+          <div style="margin-top:14px;">
+            <button type="submit" class="btn btn-primary">Stuur kommentaar / Submit comment</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Sidebar -->
+  <aside class="sidebar-col">
+    {% if post.category %}
+    <div class="widget">
+      <h3>Kategorie / Category</h3>
+      <a href="{{ post.category.get_absolute_url }}" class="widget-link">
+        {{ post.category.name_af|default:post.category.name }}
+        <span class="count">{{ post.category.posts.count }}</span>
+      </a>
+    </div>
+    {% endif %}
+
+    {% if post.tags.exists %}
+    <div class="widget">
+      <h3>Etikette / Tags</h3>
+      <div class="tag-list" style="padding-top:4px;">
+        {% for tag in post.tags.all %}
+          <a href="{{ tag.get_absolute_url }}" class="tag"># {{ tag.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="widget">
+      <h3>Elders / Elsewhere</h3>
+      <a href="{% url 'genealogy:person_list' %}" class="widget-link">Van Eeden Familieargief</a>
+      <a href="/" class="widget-link">Tuisblad</a>
+    </div>
+  </aside>
+</div>
+
+<script>
+function showLang(lang, btn) {
+  document.getElementById('body-af').style.display = lang === 'af' ? 'block' : 'none';
+  document.getElementById('body-en').style.display = lang === 'en' ? 'block' : 'none';
+  document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

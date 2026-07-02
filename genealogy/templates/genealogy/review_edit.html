@@ -1,0 +1,74 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Hersien wysiging — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:pending_edits' %}">Hersien wysigings</a> <span>›</span> Hersien
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Hersien voorgestelde wysiging</h2></div></div>
+
+<div class="card" style="margin-bottom:18px;">
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;">
+    <span class="badge badge-{% if edit.action == 'create' %}trusted{% else %}viewer{% endif %}">
+      {% if edit.action == 'create' %}Nuwe rekord{% else %}Wysiging{% endif %}
+    </span>
+    <strong>{{ edit.object_repr }}</strong>
+    <span style="color:var(--muted);font-size:13px;">
+      deur {{ edit.proposed_by.get_full_name|default:edit.proposed_by.username }} · {{ edit.submitted_at|date:"d M Y H:i" }}
+    </span>
+  </div>
+  {% if edit.note %}
+  <div style="background:var(--cream);border-radius:4px;padding:10px 14px;font-size:13px;font-style:italic;margin-bottom:14px;">"{{ edit.note }}"</div>
+  {% endif %}
+
+  {% if edit.action == 'update' and edit.field_changes %}
+  <h3 style="font-size:15px;margin-bottom:10px;">Voorgestelde veranderinge</h3>
+  <table class="diff-table">
+    <tr><th>Veld</th><th>Huidige waarde</th><th>Voorgestelde waarde</th></tr>
+    {% for field, vals in edit.field_changes.items %}
+    <tr>
+      <td style="font-weight:500;">{{ field }}</td>
+      <td class="diff-old">{{ vals.0|default:"—" }}</td>
+      <td class="diff-new">{{ vals.1|default:"—" }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% elif edit.action == 'create' %}
+  <h3 style="font-size:15px;margin-bottom:10px;">Nuwe rekorddata</h3>
+  <table class="diff-table">
+    <tr><th>Veld</th><th>Waarde</th></tr>
+    {% for field, val in edit.proposed_data.items %}
+    {% if val and val != 'None' and val != '' %}
+    <tr><td style="font-weight:500;">{{ field }}</td><td class="diff-new">{{ val }}</td></tr>
+    {% endif %}
+    {% endfor %}
+  </table>
+  {% endif %}
+</div>
+
+{% if existing %}
+<div class="card" style="margin-bottom:18px;">
+  <h3 style="font-size:15px;margin-bottom:10px;">Huidige rekord: <a href="{{ existing.get_absolute_url }}" style="color:var(--sepia);">{{ existing.full_name }}</a></h3>
+  <div style="font-size:13px;color:var(--muted);">
+    Gebore: {{ existing.birth_date|default:"Onbekend" }} {% if existing.birth_place %}— {{ existing.birth_place }}{% endif %}<br>
+    {% if existing.is_deceased %}Oorlede: {{ existing.death_date|default:"Onbekend" }} {% if existing.death_place %}— {{ existing.death_place }}{% endif %}{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<div class="card">
+  <h3 style="font-size:15px;margin-bottom:14px;">U beslissing</h3>
+  <form method="post">
+    {% csrf_token %}
+    <div class="fg" style="margin-bottom:16px;">
+      <label>Nota aan voorsteller (opsioneel)</label>
+      <textarea name="review_note" rows="2" placeholder="Verduidelik u beslissing, vra vir meer inligting, ens."></textarea>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button name="action" value="approve" class="btn btn-primary">✓ Keur goed en pas toe</button>
+      <button name="action" value="reject" class="btn btn-danger">✗ Verwerp</button>
+      <a href="{% url 'genealogy:pending_edits' %}" class="btn btn-secondary">← Terug</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

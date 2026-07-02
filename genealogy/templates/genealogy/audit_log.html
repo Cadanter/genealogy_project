@@ -1,0 +1,31 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Wysigingsgeskiedenis — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Wysigingsgeskiedenis{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Wysigingsgeskiedenis</h2><p class="subtitle">Elke wysiging ooit aan hierdie argief aangebring</p></div></div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Wanneer</th><th>Wie</th><th>Aksie</th><th>Rekord</th><th>Veranderinge</th><th>Nota</th></tr></thead>
+  <tbody>
+    {% for log in logs %}
+    <tr>
+      <td style="font-size:12px;color:var(--muted);white-space:nowrap;">{{ log.timestamp|date:"d M Y H:i" }}</td>
+      <td style="font-size:13px;">{{ log.user.get_full_name|default:log.user.username|default:"Stelsel" }}</td>
+      <td>
+        <span class="audit-action {{ log.action }}" style="font-weight:500">
+          {% if log.action == 'create' %}Geskep{% elif log.action == 'update' %}Gewysig{% else %}Verwyder{% endif %}
+        </span>
+      </td>
+      <td>{{ log.object_repr }}</td>
+      <td style="font-size:12px;">
+        {% for field, vals in log.changes.items %}
+        <div><strong>{{ field }}</strong>: {{ vals.0|default:"—" }} → {{ vals.1|default:"—" }}</div>
+        {% endfor %}
+      </td>
+      <td style="font-size:12px;color:var(--muted);font-style:italic;">{{ log.note|default:"—" }}</td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;">Nog geen geskiedenis nie.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

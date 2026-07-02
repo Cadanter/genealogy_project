@@ -1,0 +1,142 @@
+from django.conf import settings
+from django.db import migrations, models
+import django.db.models.deletion
+
+
+class Migration(migrations.Migration):
+    initial = True
+    dependencies = [
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+    operations = [
+        migrations.CreateModel(
+            name='Person',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('first_name',  models.CharField(max_length=100)),
+                ('middle_name', models.CharField(blank=True, max_length=100)),
+                ('last_name',   models.CharField(max_length=100)),
+                ('maiden_name', models.CharField(blank=True, max_length=100)),
+                ('gender',      models.CharField(choices=[('M','Male'),('F','Female'),('O','Other'),('U','Unknown')], default='U', max_length=1)),
+                ('photo',       models.ImageField(blank=True, null=True, upload_to='persons/')),
+                ('birth_date',  models.CharField(blank=True, max_length=100, help_text='GEDCOM datum')),
+                ('birth_place', models.CharField(blank=True, max_length=200)),
+                ('death_date',  models.CharField(blank=True, max_length=100, help_text='GEDCOM datum')),
+                ('death_place', models.CharField(blank=True, max_length=200)),
+                ('is_deceased', models.BooleanField(default=False)),
+                ('biography',   models.TextField(blank=True)),
+                ('notes',       models.TextField(blank=True)),
+                ('created_at',  models.DateTimeField(auto_now_add=True)),
+                ('updated_at',  models.DateTimeField(auto_now=True)),
+                ('birth_lat',   models.FloatField(blank=True, null=True)),
+                ('birth_lng',   models.FloatField(blank=True, null=True)),
+                ('death_lat',   models.FloatField(blank=True, null=True)),
+                ('death_lng',   models.FloatField(blank=True, null=True)),
+                ('created_by',  models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='created_people', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['last_name', 'first_name'], 'verbose_name_plural': 'People'},
+        ),
+        migrations.CreateModel(
+            name='UserProfile',
+            fields=[
+                ('id',          models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('role',        models.CharField(choices=[('pending','Pending Approval'),('viewer','Viewer'),('trusted','Trusted Member'),('admin','Administrator')], default='pending', max_length=10)),
+                ('bio',         models.TextField(blank=True)),
+                ('joined',      models.DateTimeField(auto_now_add=True)),
+                ('approved_at', models.DateTimeField(blank=True, null=True)),
+                ('approved_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='approved_profiles', to=settings.AUTH_USER_MODEL)),
+                ('user',        models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, related_name='profile', to=settings.AUTH_USER_MODEL)),
+            ],
+        ),
+        migrations.CreateModel(
+            name='Marriage',
+            fields=[
+                ('id',             models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('marriage_date',  models.CharField(blank=True, max_length=100)),
+                ('marriage_place', models.CharField(blank=True, max_length=200)),
+                ('end_date',       models.CharField(blank=True, max_length=100)),
+                ('end_place',      models.CharField(blank=True, max_length=200)),
+                ('status',         models.CharField(choices=[('married','Married'),('divorced','Divorced'),('widowed','Widowed'),('separated','Separated'),('annulled','Annulled')], default='married', max_length=20)),
+                ('notes',          models.TextField(blank=True)),
+                ('person1',        models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='marriages_as_person1', to='genealogy.person')),
+                ('person2',        models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='marriages_as_person2', to='genealogy.person')),
+            ],
+            options={'ordering': ['marriage_date']},
+        ),
+        migrations.CreateModel(
+            name='Relationship',
+            fields=[
+                ('id',                models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('relationship_type', models.CharField(choices=[('parent','Parent'),('adoptive_parent','Adoptive Parent'),('step_parent','Step Parent'),('guardian','Guardian')], default='parent', max_length=20)),
+                ('notes',             models.TextField(blank=True)),
+                ('person',            models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='person_relationships', to='genealogy.person')),
+                ('relative',          models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='child_relationships', to='genealogy.person')),
+            ],
+            options={'unique_together': {('person', 'relative', 'relationship_type')}},
+        ),
+        migrations.CreateModel(
+            name='Event',
+            fields=[
+                ('id',          models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('title',       models.CharField(max_length=200)),
+                ('event_type',  models.CharField(choices=[('birth','Birth'),('death','Death'),('marriage','Marriage'),('baptism','Baptism'),('immigration','Immigration'),('emigration','Emigration'),('military_service','Military Service'),('graduation','Graduation'),('other','Other')], default='other', max_length=20)),
+                ('date',        models.CharField(blank=True, max_length=100)),
+                ('place',       models.CharField(blank=True, max_length=200)),
+                ('description', models.TextField(blank=True)),
+                ('people',      models.ManyToManyField(blank=True, related_name='events', to='genealogy.person')),
+            ],
+            options={'ordering': ['date']},
+        ),
+        migrations.CreateModel(
+            name='Document',
+            fields=[
+                ('id',            models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('title',         models.CharField(max_length=200)),
+                ('document_type', models.CharField(choices=[('birth_certificate','Birth Certificate'),('death_certificate','Death Certificate'),('marriage_certificate','Marriage Certificate'),('census','Census Record'),('photo','Photograph'),('letter','Letter'),('will','Will / Testament'),('military','Military Record'),('immigration','Immigration Record'),('other','Other')], default='other', max_length=30)),
+                ('file',          models.FileField(blank=True, null=True, upload_to='documents/')),
+                ('image',         models.ImageField(blank=True, null=True, upload_to='documents/images/')),
+                ('description',   models.TextField(blank=True)),
+                ('date',          models.CharField(blank=True, max_length=100)),
+                ('source',        models.CharField(blank=True, max_length=300)),
+                ('created_at',    models.DateTimeField(auto_now_add=True)),
+                ('people',        models.ManyToManyField(blank=True, related_name='documents', to='genealogy.person')),
+                ('uploaded_by',   models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='documents', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['-created_at', 'title']},
+        ),
+        migrations.CreateModel(
+            name='AuditLog',
+            fields=[
+                ('id',          models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('action',      models.CharField(choices=[('create','Created'),('update','Updated'),('delete','Deleted')], max_length=10)),
+                ('model_name',  models.CharField(max_length=50)),
+                ('object_id',   models.IntegerField(blank=True, null=True)),
+                ('object_repr', models.CharField(max_length=200)),
+                ('changes',     models.JSONField(blank=True, default=dict)),
+                ('timestamp',   models.DateTimeField(auto_now_add=True)),
+                ('note',        models.TextField(blank=True)),
+                ('user',        models.ForeignKey(null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='audit_logs', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['-timestamp']},
+        ),
+        migrations.CreateModel(
+            name='PendingEdit',
+            fields=[
+                ('id',            models.BigAutoField(auto_created=True, primary_key=True, serialize=False)),
+                ('action',        models.CharField(choices=[('create','New Record'),('update','Edit Record')], max_length=10)),
+                ('model_name',    models.CharField(max_length=50)),
+                ('object_id',     models.IntegerField(blank=True, null=True)),
+                ('object_repr',   models.CharField(max_length=200)),
+                ('proposed_data', models.JSONField(default=dict)),
+                ('field_changes', models.JSONField(blank=True, default=dict)),
+                ('note',          models.TextField(blank=True)),
+                ('status',        models.CharField(choices=[('pending','Pending Review'),('approved','Approved'),('rejected','Rejected')], default='pending', max_length=10)),
+                ('review_note',   models.TextField(blank=True)),
+                ('reviewed_at',   models.DateTimeField(blank=True, null=True)),
+                ('submitted_at',  models.DateTimeField(auto_now_add=True)),
+                ('proposed_by',   models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='proposed_edits', to=settings.AUTH_USER_MODEL)),
+                ('reviewed_by',   models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='reviewed_edits', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={'ordering': ['-submitted_at']},
+        ),
+    ]

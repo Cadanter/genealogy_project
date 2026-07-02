@@ -1,0 +1,38 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Gebeure — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Gebeure{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:event_create' %}" class="btn btn-primary btn-sm">+ Voeg gebeurtenis by</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Gebeure</h2><p class="subtitle">{{ events.count }} gebeurtenis{{ events.count|pluralize:"se" }}</p></div></div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Gebeurtenis</th><th>Tipe</th><th>Datum</th><th>Plek</th><th>Mense</th><th></th></tr></thead>
+  <tbody>
+    {% for e in events %}
+    <tr>
+      <td>{{ e.title }}</td>
+      <td>{{ e.get_event_type_display }}</td>
+      <td>{{ e.date|default:"—" }}</td>
+      <td>{{ e.place|default:"—" }}</td>
+      <td>{{ e.people.count }}</td>
+      <td style="white-space:nowrap;">
+        <a href="{% url 'genealogy:event_detail' e.pk %}" class="btn btn-secondary btn-sm">Sien</a>
+        {% if profile and profile.can_edit %}
+          <a href="{% url 'genealogy:event_edit' e.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+          <form method="post" action="{% url 'genealogy:event_delete' e.pk %}" style="display:inline;"
+                onsubmit="return confirm('Is jy seker jy wil hierdie gebeurtenis verwyder?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;">Nog geen gebeure nie.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

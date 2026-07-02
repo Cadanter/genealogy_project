@@ -1,0 +1,137 @@
+<!-- Single-person picker modal (shared by person1, person2, person, and relative) -->
+<div id="sp-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);
+     z-index:1000;align-items:center;justify-content:center;">
+  <div style="background:var(--card-bg);border-radius:10px;padding:24px;
+              width:min(560px,92vw);max-height:80vh;display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <strong id="sp-modal-title">Kies persoon</strong>
+      <button type="button" class="btn btn-secondary" style="padding:2px 10px;"
+              onclick="spCloseModal()">✕</button>
+    </div>
+    <input type="text" id="sp-modal-search" placeholder="Soek naam of plek…"
+           oninput="spFilter(this.value)" autocomplete="off">
+    <div id="sp-results" style="overflow-y:auto;flex:1;display:flex;flex-wrap:wrap;gap:10px;padding:4px 0;"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  const ALL_PEOPLE = [
+    {% for p in all_people %}
+    {
+      id: {{ p.pk }},
+      name: "{{ p.full_name|escapejs }}",
+      birth_year: "{{ p.birth_year|default:'' }}",
+      death_year: "{{ p.death_year|default:'' }}",
+      is_deceased: {{ p.is_deceased|yesno:"true,false" }},
+      birth_place: "{{ p.birth_place|escapejs }}",
+      gender: "{{ p.gender }}"
+    }{% if not forloop.last %},{% endif %}
+    {% endfor %}
+  ];
+
+  let activeField = null;
+
+  function genderClass(g) {
+    return g === 'M' ? 'male' : g === 'F' ? 'female' : 'other';
+  }
+
+  function genderLabel(g) {
+    return g === 'M' ? 'Manlik' : g === 'F' ? 'Vroulik' : 'Ander';
+  }
+
+  function renderCard(p, clickable) {
+    const card = document.createElement('div');
+    card.className = 'pcard';
+    card.style.cssText = 'min-width:140px;max-width:180px;' + (clickable ? 'cursor:pointer;' : 'cursor:default;position:relative;');
+    card.innerHTML =
+      '<div class="pcard-name">' + p.name + '</div>' +
+      '<div class="pcard-dates" style="font-size:11px;">' +
+        (p.birth_year ? 'geb. ' + p.birth_year : '') +
+        (p.is_deceased && p.death_year ? ' – gest. ' + p.death_year : '') +
+      '</div>' +
+      (p.birth_place ? '<div style="font-size:11px;color:var(--muted);">' + p.birth_place + '</div>' : '') +
+      '<span class="badge badge-' + genderClass(p.gender) + '" style="margin-top:4px;">' +
+        genderLabel(p.gender) +
+      '</span>';
+    return card;
+  }
+
+  window.spOpen = function (fieldName) {
+    activeField = fieldName;
+    document.getElementById('sp-modal').style.display = 'flex';
+    const inp = document.getElementById('sp-modal-search');
+    inp.value = '';
+    spFilter('');
+    inp.focus();
+  };
+
+  window.spCloseModal = function () {
+    document.getElementById('sp-modal').style.display = 'none';
+    activeField = null;
+  };
+
+  window.spClear = function (fieldName) {
+    document.getElementById(fieldName + '-value').value = '';
+    document.getElementById(fieldName + '-selected').innerHTML = '';
+  };
+
+  window.spFilter = function (q) {
+    const results = document.getElementById('sp-results');
+    const lower   = q.toLowerCase();
+    const matches = ALL_PEOPLE.filter(function (p) {
+      return p.name.toLowerCase().includes(lower) ||
+             p.birth_place.toLowerCase().includes(lower);
+    });
+
+    results.innerHTML = '';
+    matches.forEach(function (p) {
+      const card = renderCard(p, true);
+      card.addEventListener('click', function () {
+        if (!activeField) return;
+
+        // Set hidden value
+        document.getElementById(activeField + '-value').value = p.id;
+
+        // Render selected card
+        const box  = document.getElementById(activeField + '-selected');
+        const full = renderCard(p, false);
+        const btn  = document.createElement('button');
+        btn.type      = 'button';
+        btn.innerHTML = '✕';
+        btn.style.cssText = 'position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);';
+        btn.onclick = (function (fn) {
+          return function () { spClear(fn); };
+        })(activeField);
+        full.appendChild(btn);
+        box.innerHTML = '';
+        box.appendChild(full);
+
+        spCloseModal();
+      });
+      results.appendChild(card);
+    });
+
+    if (matches.length === 0) {
+      results.innerHTML = '<p style="color:var(--muted);font-size:13px;">Geen mense gevind nie.</p>';
+    }
+  };
+
+  // Close on overlay click
+  document.getElementById('sp-modal').addEventListener('click', function (e) {
+    if (e.target === this) spCloseModal();
+  });
+
+  // Wire up the search inputs above each picker to open the modal
+  ['person1', 'person2', 'person', 'relative'].forEach(function (fn) {
+    const inp = document.getElementById(fn + '-search');
+    if (inp) {
+      inp.addEventListener('input', function () {
+        spOpen(fn);
+        document.getElementById('sp-modal-search').value = this.value;
+        spFilter(this.value);
+      });
+    }
+  });
+})();
+</script>

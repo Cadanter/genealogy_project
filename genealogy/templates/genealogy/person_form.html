@@ -1,0 +1,115 @@
+{% extends "genealogy/base.html" %}
+{% load static %}
+{% block title %}{{ title }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:person_list' %}">Mense</a> <span>›</span> {{ title }}
+{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'genealogy/css/datepicker.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ph"><div><h2>{{ title }}</h2><p class="subtitle">Vul in soveel of so min in as wat u weet.</p></div></div>
+
+{% if not live %}
+<div class="propose-banner">
+  ✎ <strong>U stel ʼn wysiging voor.</strong> U veranderinge sal deur ʼn familiebeheerder hersien word voordat dit sigbaar word.
+</div>
+{% endif %}
+
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <h3 style="margin-bottom:14px;">Basiese inligting</h3>
+    <div class="form-grid">
+      <div class="fg">
+        <label>Voornaam *</label>{{ form.first_name }}
+        {% if form.first_name.errors %}<small style="color:var(--rust)">{{ form.first_name.errors|join:", " }}</small>{% endif %}
+      </div>
+      <div class="fg"><label>Middel name</label>{{ form.middle_name }}</div>
+      <div class="fg">
+        <label>Van *</label>{{ form.last_name }}
+        {% if form.last_name.errors %}<small style="color:var(--rust)">{{ form.last_name.errors|join:", " }}</small>{% endif %}
+      </div>
+      <div class="fg"><label>Nooiensvan</label>{{ form.maiden_name }}</div>
+      <div class="fg"><label>Geslag</label>{{ form.gender }}</div>
+      {% if live %}<div class="fg"><label>Foto</label>{{ form.photo }}</div>{% endif %}
+    </div>
+
+    <h3 style="margin-top:22px;margin-bottom:14px;">Geboorte</h3>
+    <div class="form-grid">
+      <div class="fg" style="position:relative;">
+        <label>Geboortedatum</label>
+        <input type="text" id="birth_date_display" name="birth_date_display"
+               class="gedcom-date" placeholder="Klik om datum te kies…"
+               value="{{ form.birth_date.value|default:'' }}">
+        <input type="hidden" name="birth_date" id="birth_date"
+               value="{{ form.birth_date.value|default:'' }}">
+        <div class="gdp-age" id="age-display"></div>
+      </div>
+      <div class="fg"><label>Geboorte­plek</label>{{ form.birth_place }}</div>
+    </div>
+
+    <h3 style="margin-top:22px;margin-bottom:14px;">Afsterwe</h3>
+    <div class="form-grid">
+      <div class="fg" style="align-items:flex-start;padding-top:8px;">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;cursor:pointer;">
+          {{ form.is_deceased }} Merk as oorlede
+        </label>
+      </div>
+      <div class="fg"></div>
+      <div class="fg" style="position:relative;">
+        <label>Sterfdatum</label>
+        <input type="text" id="death_date_display" name="death_date_display"
+               class="gedcom-date" placeholder="Klik om datum te kies…"
+               value="{{ form.death_date.value|default:'' }}">
+        <input type="hidden" name="death_date" id="death_date"
+               value="{{ form.death_date.value|default:'' }}">
+      </div>
+      <div class="fg"><label>Sterfplek</label>{{ form.death_place }}</div>
+    </div>
+
+    <h3 style="margin-top:22px;margin-bottom:14px;">Biografie en aantekeninge</h3>
+    <div class="form-grid">
+      <div class="fg full"><label>Biografie</label>{{ form.biography }}</div>
+      <div class="fg full"><label>Aantekeninge</label>{{ form.notes }}</div>
+    </div>
+
+    <div class="fg full" style="margin-top:18px;">
+      <label>{% if live %}Wysigingsopsomming (opsioneel){% else %}Waarom stel u hierdie wysiging voor?{% endif %}</label>
+      <input type="text" name="note" placeholder="Kort beskrywing van hierdie wysiging…">
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">
+        {% if live %}💾 Stoor{% else %}↑ Dien voorstel in{% endif %}
+      </button>
+      {% if person %}
+        <a href="{{ person.get_absolute_url }}" class="btn btn-secondary">Kanselleer</a>
+      {% else %}
+        <a href="{% url 'genealogy:person_list' %}" class="btn btn-secondary">Kanselleer</a>
+      {% endif %}
+    </div>
+  </form>
+</div>
+
+<script src="{% static 'genealogy/js/gedcom_datepicker.js' %}"></script>
+<script>
+  /* wire age display between birth and death pickers */
+  const birthInp = document.getElementById('birth_date_display');
+  const deathInp = document.getElementById('death_date_display');
+  const ageEl    = document.getElementById('age-display');
+
+  function refreshAge() {
+    if (!birthInp._gedcomState || !deathInp._gedcomState) return;
+    const age = GedcomDatePicker.calcAge(birthInp._gedcomState, deathInp._gedcomState);
+    ageEl.textContent = age !== 'Onbekend' ? 'Ouderdom: ' + age : '';
+  }
+
+  birthInp.addEventListener('change', refreshAge);
+  deathInp.addEventListener('change', refreshAge);
+</script>
+{% endblock %}

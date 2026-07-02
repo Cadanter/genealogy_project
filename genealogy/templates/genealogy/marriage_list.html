@@ -1,0 +1,40 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Huwelike — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Huwelike{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:marriage_create' %}" class="btn btn-primary btn-sm">+ Teken huwelik aan</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Huwelike</h2><p class="subtitle">{{ marriages.count }} rekord{{ marriages.count|pluralize:"s" }}</p></div></div>
+<div class="card"><div class="table-wrap"><table>
+  <thead>
+    <tr><th>Persoon 1</th><th>Persoon 2</th><th>Getroud</th><th>Plek</th><th>Status</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for m in marriages %}
+    <tr>
+      <td><a href="{{ m.person1.get_absolute_url }}">{{ m.person1.full_name }}</a></td>
+      <td><a href="{{ m.person2.get_absolute_url }}">{{ m.person2.full_name }}</a></td>
+      <td>{{ m.marriage_date|default:"—" }}</td>
+      <td>{{ m.marriage_place|default:"—" }}</td>
+      <td><span class="badge badge-viewer">{{ m.get_status_display }}</span></td>
+      <td style="white-space:nowrap;">
+        <a href="{% url 'genealogy:marriage_detail' m.pk %}" class="btn btn-secondary btn-sm">Sien</a>
+        {% if profile and profile.can_edit %}
+          <a href="{% url 'genealogy:marriage_edit' m.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+          <form method="post" action="{% url 'genealogy:marriage_delete' m.pk %}" style="display:inline;"
+                onsubmit="return confirm('Is jy seker jy wil hierdie huwelik verwyder?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="6" style="text-align:center;color:var(--muted);padding:32px;">Geen huwelike aangeteken nie.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

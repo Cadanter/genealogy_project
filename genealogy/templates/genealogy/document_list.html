@@ -1,0 +1,37 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Dokumente — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Dokumente{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:document_create' %}" class="btn btn-primary btn-sm">+ Voeg dokument by</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Dokumente</h2><p class="subtitle">{{ documents.count }} dokument{{ documents.count|pluralize:"e" }}</p></div></div>
+<div class="card"><div class="table-wrap"><table>
+  <thead><tr><th>Titel</th><th>Tipe</th><th>Datum</th><th>Mense</th><th></th></tr></thead>
+  <tbody>
+    {% for doc in documents %}
+    <tr>
+      <td><a href="{{ doc.get_absolute_url }}">{{ doc.title }}</a></td>
+      <td>{{ doc.get_document_type_display }}</td>
+      <td>{{ doc.date|default:"—" }}</td>
+      <td>{{ doc.people.count }}</td>
+      <td style="white-space:nowrap;">
+        <a href="{{ doc.get_absolute_url }}" class="btn btn-secondary btn-sm">Sien</a>
+        {% if profile and profile.can_edit %}
+          <a href="{% url 'genealogy:document_edit' doc.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+          <form method="post" action="{% url 'genealogy:document_delete' doc.pk %}" style="display:inline;"
+                onsubmit="return confirm('Is jy seker jy wil hierdie dokument verwyder?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% empty %}
+    <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:32px;">Nog geen dokumente nie.</td></tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

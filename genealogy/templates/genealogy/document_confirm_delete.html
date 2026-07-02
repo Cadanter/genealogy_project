@@ -1,0 +1,19 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Verwyder Dokument — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:document_list' %}">Dokumente</a> <span>›</span> Verwyder
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Verwyder Dokument</h2></div></div>
+<div class="card" style="max-width:480px;">
+  <p>Is jy seker jy wil <strong>{{ document.title }}</strong> permanent verwyder?</p>
+  <div class="form-actions">
+    <form method="post">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-danger">Ja, verwyder</button>
+    </form>
+    <a href="{% url 'genealogy:document_detail' document.pk %}" class="btn btn-secondary">Kanselleer</a>
+  </div>
+</div>
+{% endblock %}

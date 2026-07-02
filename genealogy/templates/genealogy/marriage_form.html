@@ -1,0 +1,76 @@
+{% extends "genealogy/base.html" %}
+{% load static %}
+{% block title %}{{ title }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:marriage_list' %}">Huwelike</a> <span>›</span> {{ title }}
+{% endblock %}
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'genealogy/css/datepicker.css' %}">
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>{{ title }}</h2></div></div>
+<div class="card" style="max-width:640px;">
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+
+    {% include "genealogy/_person_picker_single.html" with field_name="person1" label="Persoon 1" selected_person=marriage.person1 %}
+    {% include "genealogy/_person_picker_single.html" with field_name="person2" label="Persoon 2" selected_person=marriage.person2 %}
+
+    {% for field in form %}
+      {% if field.name == 'person1' or field.name == 'person2' %}
+      {% elif field.name == 'marriage_date' or field.name == 'end_date' %}
+      <div class="fg" style="margin-bottom:14px;position:relative;">
+        <label>{{ field.label }}</label>
+        <input type="text" id="{{ field.name }}_display" name="{{ field.name }}_display"
+               class="gedcom-date" placeholder="Klik om datum te kies…">
+        <input type="hidden" name="{{ field.name }}" id="{{ field.name }}" value="{{ field.value|default:'' }}">
+      </div>
+      {% else %}
+      <div class="fg" style="margin-bottom:14px;">
+        <label>{{ field.label }}</label>{{ field }}
+        {% if field.errors %}<small style="color:var(--rust)">{{ field.errors|join:", " }}</small>{% endif %}
+      </div>
+      {% endif %}
+    {% endfor %}
+
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Wysigingsopsomming (opsioneel)</label>
+      <input type="text" name="note" placeholder="Kort nota oor hierdie wysiging…">
+    </div>
+    <div id="marriage-doc-section" style="display:none;">
+      <hr style="margin:20px 0;border-color:var(--border);">
+      <h4 id="marriage-doc-title" style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;"></h4>
+      
+      {% include "genealogy/_doc_upload.html" %}
+      
+    </div>
+    <script>
+      (function() {
+        var sel = document.querySelector('select[name="status"]');
+        var sec = document.getElementById('marriage-doc-section');
+        var ttl = document.getElementById('marriage-doc-title');
+        var labels = {
+          'married':  'Voeg Huwelik Sertifikaat by (Opsioneel)',
+          'divorced': 'Voeg Skeibrief by (Opsioneel)',
+          'annulled': 'Voeg Nietigverklaring Sertifikaat by (Opsioneel)',
+        };
+        function toggle() {
+          var v = sel ? sel.value : '';
+          var show = v === 'married' || v === 'divorced' || v === 'annulled';
+          sec.style.display = show ? 'block' : 'none';
+          if (show) ttl.textContent = labels[v] || 'Voeg Dokument by (Opsioneel)';
+        }
+        if (sel) { sel.addEventListener('change', toggle); toggle(); }
+      })();
+    </script>
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">💾 Stoor</button>
+      <a href="{% url 'genealogy:marriage_list' %}" class="btn btn-secondary">Kanselleer</a>
+    </div>
+  </form>
+</div>
+
+{% include "genealogy/_sp_modal.html" %}
+
+<script src="{% static 'genealogy/js/gedcom_datepicker.js' %}"></script>
+{% endblock %}

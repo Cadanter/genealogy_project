@@ -1,0 +1,70 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="af">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Danie van Eeden</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'core/css/landing.css' %}">
+</head>
+<body>
+
+<main class="page">
+
+  <!-- Identity -->
+  <div class="identity">
+    <div class="avatar-wrap">
+        <img src="{% static 'core/img/danie.jpg' %}" alt="Danie van Eeden">
+    </div>
+
+    <h1 class="identity-name">Danie van Eeden</h1>
+
+    <p class="identity-bio">
+      A curious mind rooted in family, history, and ideas worth writing down.
+    </p>
+    <p class="identity-bio-af">
+      ʼn Nuuskierige gees gewortel in familie, geskiedenis en idees die moeite werd om neer te skryf.
+    </p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- Project cards -->
+  <div class="projects">
+
+    <a href="{% url 'genealogy:person_list' %}" class="project-card archive">
+      <span class="card-icon">⊙</span>
+      <div class="card-title">Van Eeden Archive</div>
+      <div class="card-title-af">Familiegeskiedenisargief</div>
+      <p class="card-desc">
+        A shared record of the van Eeden family — people, marriages, documents and stories across generations.
+        <br><br>
+        <em style="font-size:12px;color:#5a5040">'n Gedeelde rekord van die van Eeden-familie oor geslagte heen.</em>
+      </p>
+      <span class="card-arrow">Besoek argief →</span>
+    </a>
+
+    <a href="{% url 'blog:post_list' %}" class="project-card blog">
+      <span class="card-icon">✍</span>
+      <div class="card-title">Danie se Blog</div>
+      <div class="card-title-af">Gedagtes en Skryfwerk</div>
+      <p class="card-desc">
+        Thoughts, observations and longer writing — in Afrikaans and English — on whatever demands attention.
+        <br><br>
+        <em style="font-size:12px;color:#5a5040">Gedagtes en langer skryfwerk in Afrikaans en Engels.</em>
+      </p>
+      <span class="card-arrow">Lees blog →</span>
+    </a>
+
+  </div>
+
+</main>
+
+<footer>
+  &copy; {% now "Y" %} Danie van Eeden
+</footer>
+
+</body>
+</html>
