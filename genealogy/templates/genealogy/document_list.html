@@ -2,6 +2,7 @@
 {% block title %}Dokumente — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Dokumente{% endblock %}
 {% block topbar_actions %}
+  <a href="{% url 'genealogy:document_search' %}" class="btn btn-secondary btn-sm">🔍 Soek</a>
   {% if profile and profile.can_edit %}
     <a href="{% url 'genealogy:document_create' %}" class="btn btn-primary btn-sm">+ Voeg dokument by</a>
   {% endif %}

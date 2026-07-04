@@ -1,0 +1,115 @@
+{% extends "genealogy/base.html" %}
+{% block title %}Soek Dokumente — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{% url 'genealogy:document_list' %}">Dokumente</a> <span>›</span> Soek
+{% endblock %}
+{% block topbar_actions %}
+  {% if profile and profile.can_edit %}
+    <a href="{% url 'genealogy:document_create' %}" class="btn btn-primary btn-sm">+ Voeg dokument by</a>
+  {% endif %}
+{% endblock %}
+{% block content %}
+<div class="ph"><div><h2>Soek Dokumente</h2></div></div>
+
+<!-- Search form -->
+<div class="card" style="margin-bottom:24px;">
+  <form method="get">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+      <div class="fg">
+        <label>Soek titel / beskrywing / bron</label>
+        <input type="text" name="q" value="{{ q }}" placeholder="Soekterm…">
+      </div>
+      <div class="fg">
+        <label>Persoon</label>
+        <input type="text" name="person" value="{{ person_q }}" placeholder="Naam van persoon…">
+      </div>
+      <div class="fg">
+        <label>Dokumenttipe</label>
+        <select name="document_type">
+          <option value="">— Alle tipes —</option>
+          {% for value, label in document_types %}
+            <option value="{{ value }}" {% if doc_type == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="fg">
+        <label>Datum van / tot (GEDCOM)</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" name="date_from" value="{{ date_from }}" placeholder="bv. 1900" style="flex:1;">
+          <input type="text" name="date_to"   value="{{ date_to }}"   placeholder="bv. 1950" style="flex:1;">
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button type="submit" class="btn btn-primary">🔍 Soek</button>
+      <a href="{% url 'genealogy:document_search' %}" class="btn btn-secondary">Stel terug</a>
+    </div>
+  </form>
+</div>
+
+<!-- Results -->
+{% if q or doc_type or person_q or date_from or date_to %}
+<div class="ph" style="margin-bottom:12px;">
+  <div><p class="subtitle">{{ count }} dokument{{ count|pluralize:"e" }} gevind</p></div>
+</div>
+
+{% if documents %}
+<div class="card"><div class="table-wrap"><table>
+  <thead>
+    <tr>
+      <th>Titel</th>
+      <th>Tipe</th>
+      <th>Datum</th>
+      <th>Mense</th>
+      <th>Gekoppel aan</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for doc in documents %}
+    <tr>
+      <td><a href="{{ doc.get_absolute_url }}">{{ doc.title }}</a></td>
+      <td>{{ doc.get_document_type_display }}</td>
+      <td>{{ doc.date_display|default:"—" }}</td>
+      <td style="font-size:12px;">
+        {% for p in doc.people.all %}
+          <a href="{{ p.get_absolute_url }}" style="display:block;">{{ p.full_name }}</a>
+        {% empty %}—{% endfor %}
+      </td>
+      <td style="font-size:12px;color:var(--muted);">
+        {% if doc.marriage %}
+          <a href="{{ doc.marriage.get_absolute_url }}">🤝 {{ doc.marriage }}</a>
+        {% elif doc.event %}
+          <a href="{{ doc.event.get_absolute_url }}">📅 {{ doc.event.title }}</a>
+        {% elif doc.relationship %}
+          <a href="{{ doc.relationship.get_absolute_url }}">👨‍👧 {{ doc.relationship }}</a>
+        {% else %}—{% endif %}
+      </td>
+      <td style="white-space:nowrap;">
+        <a href="{{ doc.get_absolute_url }}" class="btn btn-secondary btn-sm">Sien</a>
+        {% if profile and profile.can_edit %}
+          <a href="{% url 'genealogy:document_edit' doc.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+          <form method="post" action="{% url 'genealogy:document_delete' doc.pk %}" style="display:inline;"
+                onsubmit="return confirm('Is jy seker jy wil hierdie dokument verwyder?')">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+          </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--muted);">
+  Geen dokumente gevind vir hierdie soekterm nie.
+</div>
+{% endif %}
+{% else %}
+<div class="card" style="text-align:center;padding:40px;color:var(--muted);">
+  Voer ʼn soekterm in om dokumente te vind.
+</div>
+{% endif %}
+
+{% endblock %}

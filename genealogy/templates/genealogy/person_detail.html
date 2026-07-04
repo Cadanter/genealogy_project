@@ -85,6 +85,19 @@
         <div class="family-list">{% for p in parents %}<a href="{{ p.get_absolute_url }}" class="flink">⊙ {{ p.full_name }}</a>{% endfor %}</div>
       </div>
       {% endif %}
+      {% if non_blood_parents %}
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px">Nie-bloedverwante Ouers</div>
+        <div class="family-list">
+          {% for p in non_blood_parents %}
+          <a href="{{ p.person.get_absolute_url }}" class="flink">
+            ⊙ {{ p.person.full_name }}
+            <span style="font-size:10.5px;opacity:.6;">({{ p.label }})</span>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
       {% if spouses %}
       <div style="margin-bottom:14px">
         <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px">Eggenoot/Eggenote</div>
@@ -101,7 +114,20 @@
       {% if children %}
       <div style="margin-bottom:14px">
         <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px">Kinders</div>
-        <div class="family-list">{% for c in children %}<a href="{{ c.get_absolute_url }}" class="flink">⊙ {{ c.full_name }}</a>{% endfor %}</div>
+        <div class="family-list">{% for c in children %}<a href="{{ c.person.get_absolute_url }}" class="flink">⊙ {{ c.person.full_name }}</a>{% endfor %}</div>
+      </div>
+      {% endif %}
+      {% if non_blood_children %}
+      <div style="margin-bottom:14px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px">Nie-bloedverwante Kinders</div>
+        <div class="family-list">
+          {% for c in non_blood_children %}
+          <a href="{{ c.person.get_absolute_url }}" class="flink">
+            ⊙ {{ c.person.full_name }}
+            <span style="font-size:10.5px;opacity:.6;">({{ c.label }})</span>
+          </a>
+          {% endfor %}
+        </div>
       </div>
       {% endif %}
       {% if siblings %}
@@ -142,8 +168,15 @@
     <div class="card">
       <h3>Dokumente ({{ person.documents.count }})</h3>
       {% for doc in person.documents.all %}
-      <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
-        <a href="{{ doc.get_absolute_url }}" style="color:var(--sepia);">{{ doc.title }}</a>
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <a href="{{ doc.get_absolute_url }}" style="color:var(--sepia);">{{ doc.title }}</a>
+          {% if doc.document_type == 'adoption_paper' %}
+            <span style="font-size:10.5px;color:var(--muted);margin-left:4px;">(Aangeneem)</span>
+          {% elif doc.document_type == 'guardianship_paper' %}
+            <span style="font-size:10.5px;color:var(--muted);margin-left:4px;">(Pleegkind)</span>
+          {% endif %}
+        </div>
         <span style="font-size:11.5px;color:var(--muted);">{{ doc.get_document_type_display }}</span>
       </div>
       {% endfor %}

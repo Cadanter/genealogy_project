@@ -21,72 +21,329 @@
       <p class="subtitle">{{ document.get_document_type_display }}</p>
     </div>
   </div>
-  <div class="detail-grid">
-    <div>
-      {% if document.image %}
-        <img src="{{ document.image.url }}" style="width:100%;border-radius:4px;border:1px solid var(--border);margin-bottom:14px;" alt="{{ document.title }}">
-      {% endif %}
-      {% if document.file %}
-        <div class="card" style="text-align:center;">
-          {% if document.file.name|lower|slice:"-4:" == ".pdf" %}
-          <canvas id="pdf-canvas" style="max-width:100%;border-radius:4px;border:1px solid var(--border);"></canvas>
-          <div style="margin-top:10px;">
-            <a href="{{ document.file.url }}" class="btn btn-primary" download>Laai lêer af</a>
-          </div>
-          <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-          <script>
-            (function () {
-              pdfjsLib.GlobalWorkerOptions.workerSrc =
-                'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-              pdfjsLib.getDocument('{{ document.file.url }}').promise.then(function (pdf) {
-                pdf.getPage(1).then(function (page) {
-                  var canvas   = document.getElementById('pdf-canvas');
-                  var viewport = page.getViewport({ scale: 1.5 });
-                  canvas.width  = viewport.width;
-                  canvas.height = viewport.height;
-                  page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
-                });
-              });
-            })();
-          </script>
-        {% else %}
-          <p style="font-size:28px;margin-bottom:8px;">◻</p>
-          <a href="{{ document.file.url }}" class="btn btn-primary" download>Laai lêer af</a>
-        {% endif %}
-      </div>
-      {% endif %}
+    
+  <div class="card">
+    <div class="info-row">
+      <div class="ir-label">Datum</div>
+      <div class="ir-value">{{ document.date|default:"Onbekend" }}</div>
     </div>
-  <div>
-    <div class="card">
-      <div class="info-row">
-        <div class="ir-label">Datum</div>
-        <div class="ir-value">{{ document.date|default:"Onbekend" }}</div>
-      </div>
-      <div class="info-row">
-        <div class="ir-label">Bron</div>
-        <div class="ir-value">{{ document.source|default:"Nie gespesifiseer nie" }}</div>
-      </div>
-      <div class="info-row">
-        <div class="ir-label">Opgelaai deur</div>
-        <div class="ir-value">{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username|default:"Onbekend" }}</div>
-      </div>
-      {% if document.description %}
-        <div class="info-row">
-          <div class="ir-label">Beskrywing</div>
-          <div class="ir-value">{{ document.description }}</div>
-        </div>
-      {% endif %}
+    <div class="info-row">
+      <div class="ir-label">Bron</div>
+      <div class="ir-value">{{ document.source|default:"Nie gespesifiseer nie" }}</div>
     </div>
-    {% if document.people.exists %}
-      <div class="card">
-        <h3>Verwante mense</h3>
-        <div class="family-list">
-          {% for p in document.people.all %}
-            <a href="{{ p.get_absolute_url }}" class="flink">⊙ {{ p.full_name }}</a>
-          {% endfor %}
-        </div>
+    <div class="info-row">
+      <div class="ir-label">Opgelaai deur</div>
+      <div class="ir-value">{{ document.uploaded_by.get_full_name|default:document.uploaded_by.username|default:"Onbekend" }}</div>
+    </div>
+    {% if document.description %}
+      <div class="info-row">
+        <div class="ir-label">Beskrywing</div>
+        <div class="ir-value">{{ document.description }}</div>
       </div>
     {% endif %}
   </div>
-  </div>
+  {% if document.people.exists %}
+    <div class="card">
+      <h3>Verwante mense</h3>
+      <div class="family-list">
+        {% for p in document.people.all %}
+          <a href="{{ p.get_absolute_url }}" class="flink">⊙ {{ p.full_name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+  {% if document.file %}
+    <div class="viewer">
+      <div class="preview-pane">
+        <div class="preview-toolbar">
+          <button id="prevPageBtn" type="button">← Previous</button>
+          <button id="nextPageBtn" type="button">Next →</button>
+          <button id="zoomOutBtn" type="button">− Zoom</button>
+          <select id="zoomSelect">
+            <option value="0.75">75%</option>
+            <option value="1" selected>100%</option>
+            <option value="1.25">125%</option>
+            <option value="1.5">150%</option>
+            <option value="2">200%</option>
+          </select>
+          <button id="zoomInBtn" type="button">+ Zoom</button>
+        </div>
+        <div id="preview">No preview yet.</div>
+        <div id="pageInfo" class="page-info"></div>
+      </div>
+
+      <div class="thumb-pane">
+        <strong>Pages</strong>
+        <div id="thumbnails">No thumbnails yet.</div>
+      </div>
+    </div>
+  {% endif %}
+<div>
+  <style>
+
+    .viewer {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 1.25rem;
+      align-items: start;
+    }
+
+    .preview-pane {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+      min-height: 420px;
+    }
+
+    .preview-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 0.75rem;
+    }
+
+    .preview-toolbar button,
+    .preview-toolbar select {
+      padding: 0.45rem 0.7rem;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      background: white;
+      cursor: pointer;
+    }
+
+    .preview-toolbar button:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .preview-pane canvas {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    .page-info {
+      margin-top: 0.75rem;
+      text-align: center;
+      font-weight: bold;
+      color: #333;
+    }
+
+    .thumb-pane {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    #thumbnails {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+
+    .thumb-card {
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 0.5rem;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .thumb-card.active {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+    }
+
+    .thumb-card canvas {
+      display: block;
+      margin: 0 auto;
+      max-width: 100%;
+      height: auto;
+    }
+
+    .thumb-card .page-label {
+      margin-top: 0.4rem;
+      font-size: 0.85rem;
+      color: #444;
+    }
+  </style>
+
+  
+
+    <script type="module">
+    import * as pdfjsLib from "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.mjs";
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/5.4.149/pdf.worker.mjs";
+
+    const preview = document.getElementById("preview");
+    const pageInfo = document.getElementById("pageInfo");
+    const thumbnails = document.getElementById("thumbnails");
+    const prevPageBtn = document.getElementById("prevPageBtn");
+    const nextPageBtn = document.getElementById("nextPageBtn");
+    const zoomOutBtn = document.getElementById("zoomOutBtn");
+    const zoomInBtn = document.getElementById("zoomInBtn");
+    const zoomSelect = document.getElementById("zoomSelect");
+
+    let pdfDoc = null;
+    let currentPageNumber = 1;
+    let zoomLevel = 1;
+
+    function updatePageButtons() {
+      const hasPdf = Boolean(pdfDoc);
+      prevPageBtn.disabled = !hasPdf || currentPageNumber <= 1;
+      nextPageBtn.disabled = !hasPdf || currentPageNumber >= pdfDoc.numPages;
+    }
+
+    function updateZoomButtons() {
+      zoomOutBtn.disabled = zoomLevel <= 0.75;
+      zoomInBtn.disabled = zoomLevel >= 2;
+      zoomSelect.value = String(zoomLevel);
+    }
+
+    async function renderPage(pageNumber) {
+      if (!pdfDoc) {
+        return;
+      }
+
+      preview.innerHTML = "Loading page...";
+      pageInfo.textContent = `Loading page ${pageNumber}...`;
+
+      try {
+        const page = await pdfDoc.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: zoomLevel });
+        const canvas = document.createElement("canvas");
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+
+        const context = canvas.getContext("2d");
+        await page.render({ canvasContext: context, viewport }).promise;
+
+        preview.innerHTML = "";
+        preview.appendChild(canvas);
+        pageInfo.textContent = `Page ${pageNumber} of ${pdfDoc.numPages}`;
+        currentPageNumber = pageNumber;
+        updatePageButtons();
+
+        Array.from(thumbnails.children).forEach(card => {
+          card.classList.toggle("active", Number(card.dataset.pageNumber) === pageNumber);
+        });
+      } catch (error) {
+        preview.textContent = "Failed to render page.";
+        pageInfo.textContent = "Unable to display this page.";
+        console.error(error);
+      }
+    }
+
+    async function loadPdf() {
+      preview.innerHTML = "Loading PDF...";
+      pageInfo.textContent = "";
+      thumbnails.innerHTML = "Loading thumbnails...";
+
+      try {
+        const pdfUrl = '{{ document.file.url }}';
+        console.log('Loading PDF from:', pdfUrl);
+
+        const loadingTask = pdfjsLib.getDocument(pdfUrl);
+        pdfDoc = await loadingTask.promise;
+        const pageCount = pdfDoc.numPages;
+        currentPageNumber = 1;
+        zoomLevel = 1;
+        updateZoomButtons();
+        updatePageButtons();
+
+        thumbnails.innerHTML = "";
+
+        for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+          const page = await pdfDoc.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: 0.16 });
+          const canvas = document.createElement("canvas");
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+
+          const context = canvas.getContext("2d");
+          await page.render({ canvasContext: context, viewport }).promise;
+
+          const card = document.createElement("button");
+          card.type = "button";
+          card.className = "thumb-card";
+          card.dataset.pageNumber = String(pageNumber);
+          card.appendChild(canvas);
+
+          const label = document.createElement("div");
+          label.className = "page-label";
+          label.textContent = `Page ${pageNumber}`;
+          card.appendChild(label);
+
+          card.addEventListener("click", () => {
+            renderPage(pageNumber);
+          });
+
+          thumbnails.appendChild(card);
+        }
+
+        await renderPage(1);
+      } catch (error) {
+        preview.textContent = "Failed to load PDF.";
+        pageInfo.textContent = "";
+        thumbnails.textContent = "Failed to render thumbnails.";
+        console.error(error);
+      }
+    }
+
+    prevPageBtn.addEventListener("click", () => {
+      if (pdfDoc && currentPageNumber > 1) {
+        renderPage(currentPageNumber - 1);
+      }
+    });
+
+    nextPageBtn.addEventListener("click", () => {
+      if (pdfDoc && currentPageNumber < pdfDoc.numPages) {
+        renderPage(currentPageNumber + 1);
+      }
+    });
+
+    zoomOutBtn.addEventListener("click", () => {
+      if (zoomLevel > 0.75) {
+        zoomLevel = Math.max(0.75, Number((zoomLevel - 0.25).toFixed(2)));
+        updateZoomButtons();
+        if (pdfDoc) {
+          renderPage(currentPageNumber);
+        }
+      }
+    });
+
+    zoomInBtn.addEventListener("click", () => {
+      if (zoomLevel < 2) {
+        zoomLevel = Math.min(2, Number((zoomLevel + 0.25).toFixed(2)));
+        updateZoomButtons();
+        if (pdfDoc) {
+          renderPage(currentPageNumber);
+        }
+      }
+    });
+
+    zoomSelect.addEventListener("change", () => {
+      zoomLevel = Number(zoomSelect.value);
+      updateZoomButtons();
+      if (pdfDoc) {
+        renderPage(currentPageNumber);
+      }
+    });
+
+    // Load PDF on page load
+    {% if document.file %}
+    if ('{{ document.file.url }}') {
+      loadPdf();
+    }
+    {% endif %}
+  </script>
 {% endblock %}

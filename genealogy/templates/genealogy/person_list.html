@@ -27,6 +27,7 @@
 
 {% if people %}
 <!-- Sort controls -->
+{% load genealogy_extras %}
 <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
   <span style="font-size:13px;color:var(--muted);">Sorteer:</span>
   <a href="?q={{ q }}&gender={{ gender }}&birth_from={{ birth_from }}&birth_to={{ birth_to }}&sort=name"
@@ -37,10 +38,21 @@
      class="btn btn-sm {% if sort == 'birth' %}btn-primary{% else %}btn-secondary{% endif %}">
     Geboortejaar
   </a>
+  {% if henry_map %}
+  <a href="?q={{ q }}&gender={{ gender }}&birth_from={{ birth_from }}&birth_to={{ birth_to }}&sort=henry"
+     class="btn btn-sm {% if sort == 'henry' %}btn-primary{% else %}btn-secondary{% endif %}">
+    Henry Nommer
+  </a>
+  {% endif %}
 </div>
 <div class="person-grid">
   {% for p in people %}
   <a href="{{ p.get_absolute_url }}" class="pcard">
+    {% if henry_map %}
+      {% with hn=henry_map|get_item:p.pk %}
+        {% if hn %}<div style="font-size:10.5px;color:var(--muted);font-family:monospace;margin-bottom:2px;">{{ hn }}</div>{% endif %}
+      {% endwith %}
+    {% endif %}
     <div class="pcard-name">{{ p.full_name }}</div>
     <div class="pcard-dates">
       {% if p.birth_date %}geb. {{ p.birth_year }}{% endif %}

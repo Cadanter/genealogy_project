@@ -10,53 +10,58 @@
     <a href="{% url 'genealogy:marriage_edit' marriage.pk %}" class="btn btn-primary btn-sm">Wysig</a>
     <form method="post" action="{% url 'genealogy:marriage_delete' marriage.pk %}" style="display:inline;"
           onsubmit="return confirm('Is jy seker jy wil hierdie huwelik verwyder?')">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+      {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
     </form>
   {% endif %}
 {% endblock %}
 {% block content %}
 <div class="ph"><div><h2>{{ marriage }}</h2><p class="subtitle">{{ marriage.get_status_display }}</p></div></div>
 
-<div class="card" style="max-width:640px;">
-  <table style="width:100%;border-collapse:collapse;">
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);width:160px;">Persoon 1</th>
-        <td style="padding:8px 0;"><a href="{{ marriage.person1.get_absolute_url }}">{{ marriage.person1.full_name }}</a></td></tr>
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Persoon 2</th>
-        <td style="padding:8px 0;"><a href="{{ marriage.person2.get_absolute_url }}">{{ marriage.person2.full_name }}</a></td></tr>
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Huweliksdatum</th>
-        <td style="padding:8px 0;">{{ marriage.marriage_date_display|default:"—" }}</td></tr>
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Huweliksplek</th>
-        <td style="padding:8px 0;">{{ marriage.marriage_place|default:"—" }}</td></tr>
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Status</th>
-        <td style="padding:8px 0;"><span class="badge badge-viewer">{{ marriage.get_status_display }}</span></td></tr>
-    {% if marriage.end_date %}
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Einddatum</th>
-        <td style="padding:8px 0;">{{ marriage.end_date_display }}</td></tr>
-    {% endif %}
-    {% if marriage.end_place %}
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Eindplek</th>
-        <td style="padding:8px 0;">{{ marriage.end_place }}</td></tr>
-    {% endif %}
-    {% if marriage.notes %}
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);vertical-align:top;">Notas</th>
-        <td style="padding:8px 0;">{{ marriage.notes|linebreaksbr }}</td></tr>
-    {% endif %}
-  </table>
-</div>
-
 {% if documents %}
-<div class="ph" style="margin-top:24px;"><div><h3>Dokumente</h3></div></div>
-<div class="card"><div class="table-wrap"><table>
-  <thead><tr><th>Titel</th><th>Tipe</th><th>Datum</th><th></th></tr></thead>
-  <tbody>
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+window._pdfjsLib = pdfjsLib;
+</script>
+{% endif %}
+
+<div class="detail-grid">
+  <div>
     {% for doc in documents %}
-    <tr>
-      <td><a href="{{ doc.get_absolute_url }}">{{ doc.title }}</a></td>
-      <td>{{ doc.get_document_type_display }}</td>
-      <td>{{ doc.date|default:"—" }}</td>
-      <td style="white-space:nowrap;">
-        <a href="{{ doc.get_absolute_url }}" class="btn btn-secondary btn-sm">Sien</a>
+    <p class="subtitle" style="margin-bottom:4px;">{{ doc.get_document_type_display }}</p>
+    <div class="card" style="text-align:center;margin-bottom:16px;">
+      {% if doc.file %}
+        {% if doc.file.name|lower|slice:"-4:" == ".pdf" %}
+          <canvas id="pdf-canvas-{{ forloop.counter }}"
+                  style="max-width:100%;border-radius:4px;border:1px solid var(--border);display:block;margin-bottom:8px;"></canvas>
+          <script>
+          (function(counter, url) {
+            function render() {
+              if (!window._pdfjsLib) { setTimeout(function(){ render(); }, 100); return; }
+              window._pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                pdf.getPage(1).then(function(page) {
+                  var canvas = document.getElementById('pdf-canvas-' + counter);
+                  var viewport = page.getViewport({ scale: 1.5 });
+                  canvas.width = viewport.width; canvas.height = viewport.height;
+                  page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+                });
+              });
+            }
+            render();
+          })({{ forloop.counter }}, '{{ doc.file.url }}');
+          </script>
+        {% else %}
+          <p style="font-size:28px;margin-bottom:8px;">◻</p>
+        {% endif %}
+      {% endif %}
+      {% if doc.image %}
+        <img src="{{ doc.image.url }}" style="max-width:100%;border-radius:4px;border:1px solid var(--border);margin-bottom:8px;" alt="{{ doc.title }}">
+      {% endif %}
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:4px;">
+        {% if doc.file %}
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm">Sien</a>
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm" download>Aflaai</a>
+        {% endif %}
         {% if profile and profile.can_edit %}
           <a href="{% url 'genealogy:document_edit' doc.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
           <form method="post" action="{% url 'genealogy:document_delete' doc.pk %}" style="display:inline;"
@@ -64,10 +69,35 @@
             {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
           </form>
         {% endif %}
-      </td>
-    </tr>
+      </div>
+    </div>
     {% endfor %}
-  </tbody>
-</table></div></div>
-{% endif %}
+  </div>
+  <div>
+    <div class="card">
+      <div class="info-row"><div class="ir-label">Persoon 1</div>
+        <div class="ir-value"><a href="{{ marriage.person1.get_absolute_url }}">{{ marriage.person1.full_name }}</a></div></div>
+      <div class="info-row"><div class="ir-label">Persoon 2</div>
+        <div class="ir-value"><a href="{{ marriage.person2.get_absolute_url }}">{{ marriage.person2.full_name }}</a></div></div>
+      <div class="info-row"><div class="ir-label">Huweliksdatum</div>
+        <div class="ir-value">{{ marriage.marriage_date_display|default:"—" }}</div></div>
+      <div class="info-row"><div class="ir-label">Huweliksplek</div>
+        <div class="ir-value">{{ marriage.marriage_place|default:"—" }}</div></div>
+      <div class="info-row"><div class="ir-label">Status</div>
+        <div class="ir-value"><span class="badge badge-viewer">{{ marriage.get_status_display }}</span></div></div>
+      {% if marriage.end_date %}
+      <div class="info-row"><div class="ir-label">Einddatum</div>
+        <div class="ir-value">{{ marriage.end_date_display }}</div></div>
+      {% endif %}
+      {% if marriage.end_place %}
+      <div class="info-row"><div class="ir-label">Eindplek</div>
+        <div class="ir-value">{{ marriage.end_place }}</div></div>
+      {% endif %}
+      {% if marriage.notes %}
+      <div class="info-row"><div class="ir-label">Notas</div>
+        <div class="ir-value">{{ marriage.notes|linebreaksbr }}</div></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

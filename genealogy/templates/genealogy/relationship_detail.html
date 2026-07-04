@@ -10,41 +10,58 @@
     <a href="{% url 'genealogy:relationship_edit' relationship.pk %}" class="btn btn-primary btn-sm">Wysig</a>
     <form method="post" action="{% url 'genealogy:relationship_delete' relationship.pk %}" style="display:inline;"
           onsubmit="return confirm('Is jy seker jy wil hierdie verhouding verwyder?')">
-      {% csrf_token %}
-      <button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+      {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
     </form>
   {% endif %}
 {% endblock %}
 {% block content %}
 <div class="ph"><div><h2>Verhouding</h2><p class="subtitle">{{ relationship.get_relationship_type_display }}</p></div></div>
 
-<div class="card" style="max-width:640px;">
-  <table style="width:100%;border-collapse:collapse;">
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);width:160px;">Ouer</th>
-        <td style="padding:8px 0;"><a href="{{ relationship.person.get_absolute_url }}">{{ relationship.person.full_name }}</a></td></tr>
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Kind</th>
-        <td style="padding:8px 0;"><a href="{{ relationship.relative.get_absolute_url }}">{{ relationship.relative.full_name }}</a></td></tr>
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);">Tipe</th>
-        <td style="padding:8px 0;"><span class="badge badge-viewer">{{ relationship.get_relationship_type_display }}</span></td></tr>
-    {% if relationship.notes %}
-    <tr><th style="text-align:left;padding:8px 0;color:var(--muted);vertical-align:top;">Notas</th>
-        <td style="padding:8px 0;">{{ relationship.notes|linebreaksbr }}</td></tr>
-    {% endif %}
-  </table>
-</div>
-
 {% if documents %}
-<div class="ph" style="margin-top:24px;"><div><h3>Dokumente</h3></div></div>
-<div class="card"><div class="table-wrap"><table>
-  <thead><tr><th>Titel</th><th>Tipe</th><th>Datum</th><th></th></tr></thead>
-  <tbody>
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+window._pdfjsLib = pdfjsLib;
+</script>
+{% endif %}
+
+<div class="detail-grid">
+  <div>
     {% for doc in documents %}
-    <tr>
-      <td><a href="{{ doc.get_absolute_url }}">{{ doc.title }}</a></td>
-      <td>{{ doc.get_document_type_display }}</td>
-      <td>{{ doc.date|default:"—" }}</td>
-      <td style="white-space:nowrap;">
-        <a href="{{ doc.get_absolute_url }}" class="btn btn-secondary btn-sm">Sien</a>
+    <p class="subtitle" style="margin-bottom:4px;">{{ doc.get_document_type_display }}</p>
+    <div class="card" style="text-align:center;margin-bottom:16px;">
+      {% if doc.file %}
+        {% if doc.file.name|lower|slice:"-4:" == ".pdf" %}
+          <canvas id="pdf-canvas-{{ forloop.counter }}"
+                  style="max-width:100%;border-radius:4px;border:1px solid var(--border);display:block;margin-bottom:8px;"></canvas>
+          <script>
+          (function(counter, url) {
+            function render() {
+              if (!window._pdfjsLib) { setTimeout(function(){ render(); }, 100); return; }
+              window._pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                pdf.getPage(1).then(function(page) {
+                  var canvas = document.getElementById('pdf-canvas-' + counter);
+                  var viewport = page.getViewport({ scale: 1.5 });
+                  canvas.width = viewport.width; canvas.height = viewport.height;
+                  page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+                });
+              });
+            }
+            render();
+          })({{ forloop.counter }}, '{{ doc.file.url }}');
+          </script>
+        {% else %}
+          <p style="font-size:28px;margin-bottom:8px;">◻</p>
+        {% endif %}
+      {% endif %}
+      {% if doc.image %}
+        <img src="{{ doc.image.url }}" style="max-width:100%;border-radius:4px;border:1px solid var(--border);margin-bottom:8px;" alt="{{ doc.title }}">
+      {% endif %}
+      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:4px;">
+        {% if doc.file %}
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm">Sien</a>
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm" download>Aflaai</a>
+        {% endif %}
         {% if profile and profile.can_edit %}
           <a href="{% url 'genealogy:document_edit' doc.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
           <form method="post" action="{% url 'genealogy:document_delete' doc.pk %}" style="display:inline;"
@@ -52,10 +69,23 @@
             {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
           </form>
         {% endif %}
-      </td>
-    </tr>
+      </div>
+    </div>
     {% endfor %}
-  </tbody>
-</table></div></div>
-{% endif %}
+  </div>
+  <div>
+    <div class="card">
+      <div class="info-row"><div class="ir-label">Ouer</div>
+        <div class="ir-value"><a href="{{ relationship.person.get_absolute_url }}">{{ relationship.person.full_name }}</a></div></div>
+      <div class="info-row"><div class="ir-label">Kind</div>
+        <div class="ir-value"><a href="{{ relationship.relative.get_absolute_url }}">{{ relationship.relative.full_name }}</a></div></div>
+      <div class="info-row"><div class="ir-label">Verhouding</div>
+        <div class="ir-value"><span class="badge badge-viewer">{{ relationship.get_relationship_type_display }}</span></div></div>
+      {% if relationship.notes %}
+      <div class="info-row"><div class="ir-label">Notas</div>
+        <div class="ir-value">{{ relationship.notes|linebreaksbr }}</div></div>
+      {% endif %}
+    </div>
+  </div>
+</div>
 {% endblock %}

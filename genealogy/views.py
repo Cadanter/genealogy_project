@@ -109,9 +109,9 @@ def person_list(request):
 
     if q:
         people = people.filter(
-            models.Q(first_name__icontains=q) |
-            models.Q(last_name__icontains=q)  |
-            models.Q(birth_place__icontains=q)
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q)  |
+            Q(birth_place__icontains=q)
         )
     if gender:
         people = people.filter(gender=gender)
@@ -124,10 +124,27 @@ def person_list(request):
         # Sort in Python since birth_date is a CharField with GEDCOM strings
         people = sorted(people, key=lambda p: p.birth_year or 9999)
     else:
-        people = people.order_by('last_name', 'first_name')
+        people = people.order_by('first_name', 'last_name')
 
+    # Compute Henry numbers
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+
+    # Henry sort option
+    if sort == 'henry' and henry_map:
+        people = sorted(people, key=lambda p: henry_map.get(p.pk, 'zzzzz'))
+    elif sort == 'birth':
+        people = sorted(people, key=lambda p: p.birth_year or 9999)
+    else:
+        people = people.order_by('first_name', 'last_name')
+
+    form = SearchForm(request.GET or None)
     return render(request, 'genealogy/person_list.html', {
         'people': people, 'profile': profile, 'sort': sort,
+        'form': form, 'henry_map': henry_map,
         'q': q, 'gender': gender, 'birth_from': birth_from, 'birth_to': birth_to,
     })
 
@@ -175,10 +192,34 @@ def person_detail(request, pk):
 
     audit_log = AuditLog.objects.filter(model_name='Person', object_id=pk).select_related('user')
 
+    # Separate blood children from non-blood children for display
+    blood_children = []
+    non_blood_children = []
+    NON_BLOOD = {'adoptive_parent': 'Aangeneem', 'step_parent': 'Stiefkind', 'guardian': 'Pleegkind'}
+    for rel in person.person_relationships.all():
+        if rel.relationship_type == 'parent':
+            blood_children.append({'person': rel.relative, 'label': None})
+        elif rel.relationship_type in NON_BLOOD:
+            non_blood_children.append({'person': rel.relative, 'label': NON_BLOOD[rel.relationship_type]})
+
+    # Non-blood parents with label
+    non_blood_parents = []
+    blood_parents = []
+    for rel in person.child_relationships.all():
+        if rel.relationship_type == 'parent':
+            blood_parents.append(rel.person)
+        elif rel.relationship_type in NON_BLOOD:
+            non_blood_parents.append({'person': rel.person, 'label': NON_BLOOD[rel.relationship_type]})
+
+    from .henry import get_henry_number
+    henry_number = get_henry_number(person)
+
     return render(request, 'genealogy/person_detail.html', {
-        'person': person, 'parents': parents, 'children': children,
+        'person': person, 'parents': blood_parents, 'children': blood_children,
+        'non_blood_parents': non_blood_parents, 'non_blood_children': non_blood_children,
         'siblings': siblings, 'spouses': spouses,
         'timeline': timeline, 'audit_log': audit_log, 'profile': profile,
+        'henry_number': henry_number,
     })
 
 
@@ -195,6 +236,8 @@ def person_create(request):
                 person = form.save(commit=False)
                 person.created_by = request.user
                 person.save()
+                _create_person_document(request, person, 'birth')
+                _create_person_document(request, person, 'death')
                 record_audit(request.user, 'create', person, note=request.POST.get('note',''))
                 messages.success(request, f'{person.full_name} is by die argief gevoeg.')
                 return redirect('genealogy:person_detail', pk=person.pk)
@@ -233,6 +276,8 @@ def person_edit(request, pk):
             form = PersonForm(request.POST, request.FILES, instance=person)
             if form.is_valid():
                 updated = form.save()
+                _create_person_document(request, updated, 'birth')
+                _create_person_document(request, updated, 'death')
                 record_audit(request.user, 'update', updated,
                     diff_dicts(old_data, model_to_dict_simple(updated)),
                     note=request.POST.get('note',''))
@@ -462,7 +507,7 @@ def marriage_create(request):
         form = MarriageForm()
     return render(request, 'genealogy/marriage_form.html',
         {'form': form, 'title': 'Teken huwelik aan', 'profile': profile,
-        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
 
 
 @login_required
@@ -485,10 +530,13 @@ def marriage_edit(request, pk):
             return redirect('genealogy:marriage_detail', pk=pk)
     else:
         form = MarriageForm(instance=marriage)
+    # Fetch existing linked documents for display in the edit form
+    existing_docs = Document.objects.filter(marriage=marriage)
     return render(request, 'genealogy/marriage_form.html',
         {'form': form, 'title': 'Wysig huwelik', 'profile': profile,
         'marriage': marriage,
-        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+        'existing_docs': existing_docs,
+        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
 
 
 def marriage_detail(request, pk):
@@ -509,8 +557,10 @@ def marriage_delete(request, pk):
         return redirect('genealogy:marriage_detail', pk=pk)
     if request.method == 'POST':
         record_audit(request.user, 'delete', marriage)
+        # Delete documents linked to both persons in this marriage
+        Document.objects.filter(marriage=marriage).delete()
         marriage.delete()
-        messages.success(request, 'Huwelik verwyder.')
+        messages.success(request, 'Huwelik en verwante dokumente verwyder.')
         return redirect('genealogy:marriage_list')
     return render(request, 'genealogy/marriage_confirm_delete.html',
         {'marriage': marriage, 'profile': profile})
@@ -549,7 +599,7 @@ def relationship_create(request):
     else:
         form = RelationshipForm()
     return render(request, 'genealogy/relationship_form.html', {'form': form, 'profile': profile,
-        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
 
 @login_required
 def relationship_edit(request, pk):
@@ -570,9 +620,11 @@ def relationship_edit(request, pk):
             return redirect('genealogy:relationship_detail', pk=pk)
     else:
         form = RelationshipForm(instance=relationship)
+    existing_docs = Document.objects.filter(relationship=relationship)
     return render(request, 'genealogy/relationship_form.html', {'form': form, 'profile': profile,
         'relationship': relationship,
-        'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+        'existing_docs': existing_docs,
+        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
 
 def relationship_delete(request, pk):
     profile = get_profile(request.user)
@@ -581,9 +633,11 @@ def relationship_delete(request, pk):
         return redirect('genealogy:person_list')
     relationship = get_object_or_404(Relationship, pk=pk)
     if request.method == 'POST':
-        relationship.delete()
+        # Delete linked adoption/guardianship documents first
+        Document.objects.filter(relationship=relationship).delete()
         record_audit(request.user, 'delete', relationship)
-        messages.success(request, 'Verhouding verwyder.')
+        relationship.delete()
+        messages.success(request, 'Verhouding en verwante dokumente verwyder.')
         return redirect('genealogy:relationship_list')
     return render(request, 'genealogy/relationship_confirm_delete.html', {'relationship': relationship, 'profile': profile})
 
@@ -621,7 +675,7 @@ def document_create(request):
     else:
         form = DocumentForm()
     return render(request, 'genealogy/document_form.html',
-        {'form': form, 'title': 'Voeg dokument by', 'profile': profile, 'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+        {'form': form, 'title': 'Voeg dokument by', 'profile': profile, 'all_people': Person.objects.all().order_by('first_name', 'last_name')})
 
 @login_required
 def document_edit(request, pk):
@@ -642,7 +696,7 @@ def document_edit(request, pk):
         form = DocumentForm(instance=document)
     return render(request, 'genealogy/document_form.html',
         {'form': form, 'title': 'Wysig dokument', 'profile': profile,
-        'all_people': Person.objects.all().order_by('last_name', 'first_name'),
+        'all_people': Person.objects.all().order_by('first_name', 'last_name'),
         'document': document})
 
 @login_required
@@ -679,7 +733,14 @@ def event_create(request):
         form = EventForm(request.POST, request.FILES)
         if form.is_valid():
             event = form.save()
-            event.people.set(event.people.all())  # ensure M2M saved
+            # Add main_person to people if provided
+            main_pk = request.POST.get('main_person')
+            if main_pk:
+                try:
+                    main_p = Person.objects.get(pk=main_pk)
+                    event.people.add(main_p)
+                except Person.DoesNotExist:
+                    pass
             _create_event_document(request, event)
             record_audit(request.user, 'create', event)
             messages.success(request, 'Gebeurtenis gevoeg.')
@@ -687,13 +748,20 @@ def event_create(request):
     else:
         form = EventForm()
     return render(request, 'genealogy/event_form.html',
-        {'form': form, 'title': 'Voeg gebeurtenis by', 'profile': profile, 'all_people': Person.objects.all().order_by('last_name', 'first_name')})
+        {'form': form, 'title': 'Voeg gebeurtenis by', 'profile': profile, 'all_people': Person.objects.all().order_by('first_name', 'last_name')})
 
 def event_detail(request, pk):
     profile = get_profile(request.user)
     event   = get_object_or_404(Event, pk=pk)
+    from .gedcom_dates import parse_gedcom_date
+    from .gedcom_dates import parse_gedcom_date
+    docs = list(Document.objects.filter(event=event))
+    def doc_year(doc):
+        p = parse_gedcom_date(doc.date)
+        return int(p.get('year', 9999)) if p else 9999
+    docs = sorted(docs, key=doc_year)
     return render(request, 'genealogy/event_detail.html',
-        {'event': event, 'profile': profile})
+        {'event': event, 'documents': docs, 'profile': profile})
 
 @login_required
 def event_edit(request, pk):
@@ -706,16 +774,25 @@ def event_edit(request, pk):
         form = EventForm(request.POST, request.FILES, instance=event)
         if form.is_valid():
             event = form.save()
+            main_pk = request.POST.get('main_person')
+            if main_pk:
+                try:
+                    main_p = Person.objects.get(pk=main_pk)
+                    event.people.add(main_p)
+                except Person.DoesNotExist:
+                    pass
             _create_event_document(request, event)
             record_audit(request.user, 'update', event)
             messages.success(request, 'Gebeurtenis gewysig.')
             return redirect('genealogy:event_detail', pk=pk)
     else:
         form = EventForm(instance=event)
+    main_person = event.people.first()
+    existing_docs = Document.objects.filter(event=event)
     return render(request, 'genealogy/event_form.html',
         {'form': form, 'title': 'Wysig gebeurtenis', 'profile': profile,
-        'all_people': Person.objects.all().order_by('last_name', 'first_name'),
-        'event': event})
+        'all_people': Person.objects.all().order_by('first_name', 'last_name'),
+        'event': event, 'main_person': main_person, 'existing_docs': existing_docs})
 
 @login_required
 def event_delete(request, pk):
@@ -725,9 +802,11 @@ def event_delete(request, pk):
         messages.error(request, 'Slegs vertroude lede kan gebeure verwyder.')
         return redirect('genealogy:event_detail', pk=pk)
     if request.method == 'POST':
+        # Delete documents linked to the first person on this event
+        Document.objects.filter(event=event).delete()
         record_audit(request.user, 'delete', event)
         event.delete()
-        messages.success(request, 'Gebeurtenis verwyder.')
+        messages.success(request, 'Gebeurtenis en verwante dokumente verwyder.')
         return redirect('genealogy:event_list')
     return render(request, 'genealogy/event_confirm_delete.html',
         {'event': event, 'profile': profile})
@@ -948,6 +1027,7 @@ def _create_marriage_document(request, marriage):
     )
     doc.file.field.upload_to = f'documents/{folder}/'
     doc.file = f
+    doc.marriage = marriage
     doc.save()
     doc.people.set([marriage.person1, marriage.person2])
 
@@ -966,9 +1046,11 @@ def _create_event_document(request, event):
         document_type=doc_type,
         description=request.POST.get('doc_description', ''),
         uploaded_by=request.user,
+        event=event,
     )
     doc.file.field.upload_to = f'documents/{folder}/'
     doc.file = f
+    doc.event = event
     doc.save()
     if first_person:
         doc.people.set([first_person])
@@ -992,5 +1074,83 @@ def _create_relationship_document(request, relationship):
     )
     doc.file.field.upload_to = f'documents/{folder}/'
     doc.file = f
+    doc.relationship = relationship
     doc.save()
     doc.people.set([relationship.relative])
+
+def _create_person_document(request, person, doc_type):
+    f = request.FILES.get(f'{doc_type}_doc_file')
+    if not f:
+        return
+    folder = Document.EVENT_FOLDER_MAP.get(doc_type)
+    if not folder:
+        return
+
+    # Find or create the corresponding event
+    event_type = 'birth' if doc_type == 'birth' else 'death'
+    event = Event.objects.filter(event_type=event_type, people=person).first()
+    if not event:
+        event = Event.objects.create(
+            event_type=event_type,
+            title=f'{person.full_name} — {"Geboorte" if doc_type == "birth" else "Sterfte"}',
+            date=getattr(person, f'{doc_type}_date', ''),
+            place=getattr(person, f'{doc_type}_place', ''),
+        )
+        event.people.add(person)
+
+    title = request.POST.get(f'{doc_type}_doc_title') or \
+        f'{person.full_name} — {"Geboortesertifikaat" if doc_type == "birth" else "Doodsertifikaat"}'
+    doc = Document(
+        title=title,
+        document_type='birth_certificate' if doc_type == 'birth' else 'death_certificate',
+        description=request.POST.get(f'{doc_type}_doc_description', ''),
+        uploaded_by=request.user,
+        event=event,
+    )
+    doc.file.field.upload_to = f'documents/{folder}/'
+    doc.file = f
+    doc.save()
+    doc.people.set([person])
+
+
+# ─── Document Search ──────────────────────────────────────────────────────────
+
+def document_search(request):
+    profile = get_profile(request.user)
+    q            = request.GET.get('q', '').strip()
+    doc_type     = request.GET.get('document_type', '')
+    person_q     = request.GET.get('person', '').strip()
+    date_from    = request.GET.get('date_from', '').strip()
+    date_to      = request.GET.get('date_to', '').strip()
+
+    documents = Document.objects.all()
+
+    if q:
+        documents = documents.filter(
+            Q(title__icontains=q) |
+            Q(description__icontains=q) |
+            Q(source__icontains=q)
+        )
+    if doc_type:
+        documents = documents.filter(document_type=doc_type)
+    if person_q:
+        documents = documents.filter(
+            Q(people__first_name__icontains=person_q) |
+            Q(people__last_name__icontains=person_q)
+        ).distinct()
+    if date_from:
+        documents = documents.filter(date__gte=date_from)
+    if date_to:
+        documents = documents.filter(date__lte=date_to)
+
+    return render(request, 'genealogy/document_search.html', {
+        'documents': documents,
+        'document_types': Document.DOCUMENT_TYPES,
+        'profile': profile,
+        'q': q,
+        'doc_type': doc_type,
+        'person_q': person_q,
+        'date_from': date_from,
+        'date_to': date_to,
+        'count': documents.count(),
+    })

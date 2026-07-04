@@ -34,6 +34,7 @@ urlpatterns = [
 
     # Documents
     path('dokumente/',                    views.document_list,     name='document_list'),
+    path('dokumente/soek/',               views.document_search,   name='document_search'),
     path('dokumente/<int:pk>/',           views.document_detail,   name='document_detail'),
     path('dokumente/voeg-by/',            views.document_create,   name='document_create'),
     path('dokumente/<int:pk>/wysig/',     views.document_edit,     name='document_edit'),

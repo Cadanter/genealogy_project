@@ -37,32 +37,72 @@
       <label>Wysigingsopsomming (opsioneel)</label>
       <input type="text" name="note" placeholder="Kort nota oor hierdie wysiging…">
     </div>
+
+    <!-- Existing documents (edit mode only) -->
+    {% if existing_docs %}
+    <hr style="margin:20px 0;border-color:var(--border);">
+    <h4 style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;">Huidige Dokumente</h4>
+
+    {% if existing_docs %}
+    <script type="module">
+    import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+    window._pdfjsLib = pdfjsLib;
+    </script>
+    {% endif %}
+
+    {% for doc in existing_docs %}
+    <div style="margin-bottom:16px;padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:6px;">{{ doc.get_document_type_display }}</p>
+      {% if doc.file %}
+        {% if doc.file.name|lower|slice:"-4:" == ".pdf" %}
+          <canvas id="edit-pdf-{{ forloop.counter }}"
+                  style="max-width:100%;border-radius:4px;border:1px solid var(--border);display:block;margin-bottom:8px;"></canvas>
+          <script>
+          (function(counter, url) {
+            function render() {
+              if (!window._pdfjsLib) { setTimeout(function(){ render(); }, 100); return; }
+              window._pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                pdf.getPage(1).then(function(page) {
+                  var canvas = document.getElementById('edit-pdf-' + counter);
+                  var viewport = page.getViewport({ scale: 1.0 });
+                  canvas.width = viewport.width; canvas.height = viewport.height;
+                  page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+                });
+              });
+            }
+            render();
+          })({{ forloop.counter }}, '{{ doc.file.url }}');
+          </script>
+        {% else %}
+          <p style="font-size:13px;margin-bottom:6px;">📄 {{ doc.title }}</p>
+        {% endif %}
+      {% endif %}
+      {% if doc.image %}
+        <img src="{{ doc.image.url }}" style="max-width:100%;border-radius:4px;border:1px solid var(--border);margin-bottom:8px;">
+      {% endif %}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        {% if doc.file %}
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm">Sien</a>
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm" download>Aflaai</a>
+        {% endif %}
+        <a href="{% url 'genealogy:document_edit' doc.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+        <form method="post" action="{% url 'genealogy:document_delete' doc.pk %}" style="display:inline;"
+              onsubmit="return confirm('Is jy seker jy wil hierdie dokument verwyder?')">
+          {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- New document upload section (shown based on status) -->
     <div id="marriage-doc-section" style="display:none;">
       <hr style="margin:20px 0;border-color:var(--border);">
       <h4 id="marriage-doc-title" style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;"></h4>
-      
       {% include "genealogy/_doc_upload.html" %}
-      
     </div>
-    <script>
-      (function() {
-        var sel = document.querySelector('select[name="status"]');
-        var sec = document.getElementById('marriage-doc-section');
-        var ttl = document.getElementById('marriage-doc-title');
-        var labels = {
-          'married':  'Voeg Huwelik Sertifikaat by (Opsioneel)',
-          'divorced': 'Voeg Skeibrief by (Opsioneel)',
-          'annulled': 'Voeg Nietigverklaring Sertifikaat by (Opsioneel)',
-        };
-        function toggle() {
-          var v = sel ? sel.value : '';
-          var show = v === 'married' || v === 'divorced' || v === 'annulled';
-          sec.style.display = show ? 'block' : 'none';
-          if (show) ttl.textContent = labels[v] || 'Voeg Dokument by (Opsioneel)';
-        }
-        if (sel) { sel.addEventListener('change', toggle); toggle(); }
-      })();
-    </script>
+
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">💾 Stoor</button>
       <a href="{% url 'genealogy:marriage_list' %}" class="btn btn-secondary">Kanselleer</a>
@@ -73,4 +113,23 @@
 {% include "genealogy/_sp_modal.html" %}
 
 <script src="{% static 'genealogy/js/gedcom_datepicker.js' %}"></script>
+<script>
+(function() {
+  var sel = document.querySelector('select[name="status"]');
+  var sec = document.getElementById('marriage-doc-section');
+  var ttl = document.getElementById('marriage-doc-title');
+  var labels = {
+    'married':  'Voeg Huwelik Sertifikaat by (Opsioneel)',
+    'divorced': 'Voeg Skeibrief by (Opsioneel)',
+    'annulled': 'Voeg Nietigverklaring Sertifikaat by (Opsioneel)',
+  };
+  function toggle() {
+    var v = sel ? sel.value : '';
+    var show = v === 'married' || v === 'divorced' || v === 'annulled';
+    sec.style.display = show ? 'block' : 'none';
+    if (show) ttl.textContent = labels[v] || 'Voeg Dokument by (Opsioneel)';
+  }
+  if (sel) { sel.addEventListener('change', toggle); toggle(); }
+})();
+</script>
 {% endblock %}

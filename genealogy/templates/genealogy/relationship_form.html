@@ -1,61 +1,94 @@
 {% extends "genealogy/base.html" %}
-{% block title %}Voeg verhouding by — Van Eeden Familiegeskiedenis{% endblock %}
+{% block title %}{{ title|default:"Verhouding" }} — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}
   <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
-  <a href="{% url 'genealogy:relationship_list' %}">Verhoudings</a> <span>›</span> Voeg verhouding by
+  <a href="{% url 'genealogy:relationship_list' %}">Verhoudings</a> <span>›</span>
+  {{ title|default:"Voeg verhouding by" }}
 {% endblock %}
 {% block content %}
-  <div class="ph">
-    <div>
-      <h2>Voeg verhouding by</h2>
-      <p class="subtitle">Koppel ʼn ouer aan ʼn kind.</p>
+<div class="ph">
+  <div><h2>{{ title|default:"Voeg verhouding by" }}</h2><p class="subtitle">Koppel ʼn ouer aan ʼn kind.</p></div>
+</div>
+<div class="card" style="max-width:580px;">
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+
+    {% include "genealogy/_person_picker_single.html" with field_name="person" label="Ouer" selected_person=relationship.person %}
+    {% include "genealogy/_person_picker_single.html" with field_name="relative" label="Kind" selected_person=relationship.relative %}
+
+    <div class="fg" style="margin-bottom:14px;">
+      <label>{{ form.relationship_type.label }}</label>
+      {{ form.relationship_type }}
+      {% if form.relationship_type.errors %}<small style="color:var(--rust)">{{ form.relationship_type.errors|join:", " }}</small>{% endif %}
     </div>
-  </div>
-  <div class="card" style="max-width:580px;">
-    <form method="post" enctype="multipart/form-data">{% csrf_token %}
 
-      {% include "genealogy/_person_picker_single.html" with field_name="person" label="Ouer" selected_person=relationship.person %}
-      {% include "genealogy/_person_picker_single.html" with field_name="relative" label="Kind" selected_person=relationship.relative %}
-
-      <div class="fg" style="margin-bottom:14px;">
-        <label>{{ form.relationship_type.label }}</label>
-        {{ form.relationship_type }}
-        {% if form.relationship_type.help_text %}<small style="color:var(--muted)">{{ form.relationship_type.help_text }}</small>{% endif %}
-        {% if form.relationship_type.errors %}<small style="color:var(--rust)">{{ form.relationship_type.errors|join:", " }}</small>{% endif %}
-      </div>
-
-      <div class="fg" style="margin-bottom:14px;">
-        <label>{{ form.notes.label }}</label>
-        {{ form.notes }}
-        {% if form.notes.help_text %}<small style="color:var(--muted)">{{ form.notes.help_text }}</small>{% endif %}
-        {% if form.notes.errors %}<small style="color:var(--rust)">{{ form.notes.errors|join:", " }}</small>{% endif %}
-      </div>
-
-      <div id="rel-doc-section" style="display:none;">
-        <hr style="margin:20px 0;border-color:var(--border);">
-      <h4 id="rel-doc-title" style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;"></h4>
-      
-      {% include "genealogy/_doc_upload.html" %}
-      
+    <div class="fg" style="margin-bottom:14px;">
+      <label>{{ form.notes.label }}</label>
+      {{ form.notes }}
+      {% if form.notes.errors %}<small style="color:var(--rust)">{{ form.notes.errors|join:", " }}</small>{% endif %}
     </div>
-    <script>
-      (function() {
-        var sel = document.querySelector('select[name="relationship_type"]');
-        var sec = document.getElementById('rel-doc-section');
-        var ttl = document.getElementById('rel-doc-title');
-        var labels = {
-          'adoptive_parent': 'Voeg Aanneming Papiere by (Opsioneel)',
-          'guardian':        'Voeg Voogdyskap Papiere by (Opsioneel)',
-        };
-        function toggle() {
-          var v = sel ? sel.value : '';
-          var show = v === 'adoptive_parent' || v === 'guardian';
-          sec.style.display = show ? 'block' : 'none';
-          if (show) ttl.textContent = labels[v] || 'Voeg Dokument by (Opsioneel)';
-        }
-        if (sel) { sel.addEventListener('change', toggle); toggle(); }
-      })();
+
+    <!-- Existing documents (edit mode only) -->
+    {% if existing_docs %}
+    <hr style="margin:20px 0;border-color:var(--border);">
+    <h4 style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;">Huidige Dokumente</h4>
+
+    <script type="module">
+    import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
+    window._pdfjsLib = pdfjsLib;
     </script>
+
+    {% for doc in existing_docs %}
+    <div style="margin-bottom:16px;padding:14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);">
+      <p style="font-size:12px;color:var(--muted);margin-bottom:6px;">{{ doc.get_document_type_display }}</p>
+      {% if doc.file %}
+        {% if doc.file.name|lower|slice:"-4:" == ".pdf" %}
+          <canvas id="edit-pdf-{{ forloop.counter }}"
+                  style="max-width:100%;border-radius:4px;border:1px solid var(--border);display:block;margin-bottom:8px;"></canvas>
+          <script>
+          (function(counter, url) {
+            function render() {
+              if (!window._pdfjsLib) { setTimeout(function(){ render(); }, 100); return; }
+              window._pdfjsLib.getDocument(url).promise.then(function(pdf) {
+                pdf.getPage(1).then(function(page) {
+                  var canvas = document.getElementById('edit-pdf-' + counter);
+                  var viewport = page.getViewport({ scale: 1.0 });
+                  canvas.width = viewport.width; canvas.height = viewport.height;
+                  page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+                });
+              });
+            }
+            render();
+          })({{ forloop.counter }}, '{{ doc.file.url }}');
+          </script>
+        {% else %}
+          <p style="font-size:13px;margin-bottom:6px;">📄 {{ doc.title }}</p>
+        {% endif %}
+      {% endif %}
+      {% if doc.image %}
+        <img src="{{ doc.image.url }}" style="max-width:100%;border-radius:4px;border:1px solid var(--border);margin-bottom:8px;">
+      {% endif %}
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        {% if doc.file %}
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm">Sien</a>
+          <a href="{{ doc.file.url }}" class="btn btn-secondary btn-sm" download>Aflaai</a>
+        {% endif %}
+        <a href="{% url 'genealogy:document_edit' doc.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+        <form method="post" action="{% url 'genealogy:document_delete' doc.pk %}" style="display:inline;"
+              onsubmit="return confirm('Is jy seker jy wil hierdie dokument verwyder?')">
+          {% csrf_token %}<button type="submit" class="btn btn-danger btn-sm">Verwyder</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+    <!-- New document upload (adoptions and guardianships only) -->
+    <div id="rel-doc-section" style="display:none;">
+      <hr style="margin:20px 0;border-color:var(--border);">
+      <h4 id="rel-doc-title" style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;"></h4>
+      {% include "genealogy/_doc_upload.html" %}
+    </div>
 
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">💾 Stoor</button>
@@ -65,4 +98,23 @@
 </div>
 
 {% include "genealogy/_sp_modal.html" %}
+
+<script>
+(function() {
+  var sel = document.querySelector('select[name="relationship_type"]');
+  var sec = document.getElementById('rel-doc-section');
+  var ttl = document.getElementById('rel-doc-title');
+  var labels = {
+    'adoptive_parent': 'Voeg Aanneming Papiere by (Opsioneel)',
+    'guardian':        'Voeg Voogdyskap Papiere by (Opsioneel)',
+  };
+  function toggle() {
+    var v = sel ? sel.value : '';
+    var show = v === 'adoptive_parent' || v === 'guardian';
+    sec.style.display = show ? 'block' : 'none';
+    if (show) ttl.textContent = labels[v] || 'Voeg Dokument by (Opsioneel)';
+  }
+  if (sel) { sel.addEventListener('change', toggle); toggle(); }
+})();
+</script>
 {% endblock %}

@@ -151,6 +151,8 @@ class DocumentForm(forms.ModelForm):
             'people': 'Mense',
         }
         widgets = {
+            'file':        forms.FileInput(),
+            'image':       forms.FileInput(),
             'date':        forms.TextInput(attrs={'placeholder': 'bv. 1923, ABT 1900'}),
             'description': forms.Textarea(attrs={'rows': 3}),
             'people':      forms.CheckboxSelectMultiple(),

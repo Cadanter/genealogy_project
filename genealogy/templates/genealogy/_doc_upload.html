@@ -1,64 +1,60 @@
 <div class="fg" style="margin-bottom:14px;">
-    <label>Lêer</label>
-    <input type="file" name="doc_file" id="doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
-    <div id="doc-preview" style="margin-top:10px;display:none;">
-        <canvas id="doc-canvas" style="max-width:100%;border:1px solid var(--border);border-radius:4px;"></canvas>
-        <img id="doc-img-preview" style="max-width:100%;border:1px solid var(--border);border-radius:4px;display:none;">
-        <p id="doc-preview-name" style="font-size:12px;color:var(--muted);margin-top:4px;"></p>
-    </div>
+  <label>Lêer</label>
+  <input type="file" name="doc_file" id="doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
+  <div id="doc-preview" style="margin-top:10px;display:none;">
+    <canvas id="doc-canvas" style="max-width:100%;border:1px solid var(--border);border-radius:4px;"></canvas>
+    <img id="doc-img-preview" style="max-width:100%;border:1px solid var(--border);border-radius:4px;display:none;">
+    <p id="doc-preview-name" style="font-size:12px;color:var(--muted);margin-top:4px;"></p>
+  </div>
 </div>
 <div class="fg" style="margin-bottom:14px;">
-    <label>Dokumenttitel (opsioneel)</label>
-    <input type="text" name="doc_title" placeholder="Laat leeg vir outomatiese titel…">
+  <label>Dokumenttitel (opsioneel)</label>
+  <input type="text" name="doc_title" placeholder="Laat leeg vir outomatiese titel…">
 </div>
 <div class="fg" style="margin-bottom:14px;">
-    <label>Beskrywing (opsioneel)</label>
-    <textarea name="doc_description" rows="2"></textarea>
+  <label>Beskrywing (opsioneel)</label>
+  <textarea name="doc_description" rows="2"></textarea>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script>
-(function () {
-    var input   = document.getElementById('doc-file-input');
-    var preview = document.getElementById('doc-preview');
-    var canvas  = document.getElementById('doc-canvas');
-    var imgPrev = document.getElementById('doc-img-preview');
-    var nameEl  = document.getElementById('doc-preview-name');
+<script type="module">
+import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.min.mjs';
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.10.38/pdf.worker.min.mjs';
 
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+var input   = document.getElementById('doc-file-input');
+var preview = document.getElementById('doc-preview');
+var canvas  = document.getElementById('doc-canvas');
+var imgPrev = document.getElementById('doc-img-preview');
+var nameEl  = document.getElementById('doc-preview-name');
 
-    input.addEventListener('change', function () {
+if (input) {
+  input.addEventListener('change', function () {
     var file = this.files[0];
     if (!file) { preview.style.display = 'none'; return; }
-
     nameEl.textContent = file.name;
     preview.style.display = 'block';
 
     if (file.type === 'application/pdf') {
-        canvas.style.display  = 'block';
-        imgPrev.style.display = 'none';
-        var reader = new FileReader();
-        reader.onload = function (e) {
-            pdfjsLib.getDocument({ data: e.target.result }).promise.then(function (pdf) {
-                pdf.getPage(1).then(function (page) {
-                    var viewport = page.getViewport({ scale: 1.5 });
-                    canvas.width  = viewport.width;
-                    canvas.height = viewport.height;
-                    page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
-                });
-            });
+      canvas.style.display  = 'block';
+      imgPrev.style.display = 'none';
+      var reader = new FileReader();
+      reader.onload = function (e) {
+        pdfjsLib.getDocument({ data: e.target.result }).promise.then(function (pdf) {
+          pdf.getPage(1).then(function (page) {
+            var viewport = page.getViewport({ scale: 1.5 });
+            canvas.width  = viewport.width;
+            canvas.height = viewport.height;
+            page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+          });
         });
-    };
-    reader.readAsArrayBuffer(file);
-
+      };
+      reader.readAsArrayBuffer(file);
     } else if (file.type.startsWith('image/')) {
-        canvas.style.display  = 'none';
-        imgPrev.style.display = 'block';
-        var reader = new FileReader();
-        reader.onload = function (e) { imgPrev.src = e.target.result; };
-        reader.readAsDataURL(file);
+      canvas.style.display  = 'none';
+      imgPrev.style.display = 'block';
+      var reader = new FileReader();
+      reader.onload = function (e) { imgPrev.src = e.target.result; };
+      reader.readAsDataURL(file);
     }
-    });
-})();
+  });
+}
 </script>

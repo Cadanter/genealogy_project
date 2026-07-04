@@ -37,6 +37,15 @@
       <div class="fg"><label>Nooiensvan</label>{{ form.maiden_name }}</div>
       <div class="fg"><label>Geslag</label>{{ form.gender }}</div>
       {% if live %}<div class="fg"><label>Foto</label>{{ form.photo }}</div>{% endif %}
+      {% if live %}
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Foto Voorskou</label>
+        <div id="photo-preview" style="margin-top:10px;display:none;">
+          <img id="photo-img-preview" style="max-width:200px;max-height:150px;border:1px solid var(--border);border-radius:4px;">
+          <p id="photo-preview-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></p>
+        </div>
+      </div>
+      {% endif %}
     </div>
 
     <h3 style="margin-top:22px;margin-bottom:14px;">Geboorte</h3>
@@ -52,6 +61,30 @@
       </div>
       <div class="fg"><label>Geboorte­plek</label>{{ form.birth_place }}</div>
     </div>
+    <div id="birth-doc-section" style="display:none;">
+      <button type="button" onclick="toggleDocSection('birth-doc-section', 'birth-doc-content')" style="background:none;border:none;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:8px 0;margin-bottom:8px;">
+        + Voeg Geboortesertifikaat by (Opsioneel)
+      </button>
+      <div id="birth-doc-content" style="display:none;">
+        <div class="fg" style="margin-bottom:14px;">
+          <label>Lêer</label>
+          <input type="file" name="birth_doc_file" id="birth-doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
+          <div id="birth-doc-preview" style="margin-top:10px;display:none;">
+            <canvas id="birth-doc-canvas" style="max-width:200px;border:1px solid var(--border);border-radius:4px;"></canvas>
+            <img id="birth-doc-img-preview" style="max-width:200px;max-height:150px;border:1px solid var(--border);border-radius:4px;display:none;">
+            <p id="birth-doc-preview-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></p>
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:14px;">
+          <label>Dokumenttitel (opsioneel)</label>
+          <input type="text" name="birth_doc_title" placeholder="Laat leeg vir outomatiese titel…">
+        </div>
+        <div class="fg" style="margin-bottom:14px;">
+          <label>Beskrywing (opsioneel)</label>
+          <textarea name="birth_doc_description" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
 
     <h3 style="margin-top:22px;margin-bottom:14px;">Afsterwe</h3>
     <div class="form-grid">
@@ -61,15 +94,43 @@
         </label>
       </div>
       <div class="fg"></div>
-      <div class="fg" style="position:relative;">
-        <label>Sterfdatum</label>
-        <input type="text" id="death_date_display" name="death_date_display"
-               class="gedcom-date" placeholder="Klik om datum te kies…"
-               value="{{ form.death_date.value|default:'' }}">
-        <input type="hidden" name="death_date" id="death_date"
-               value="{{ form.death_date.value|default:'' }}">
+    </div>
+    <div id="death-fields" style="display:none;">
+      <div class="form-grid">
+        <div class="fg" style="position:relative;">
+          <label>Sterfdatum</label>
+          <input type="text" id="death_date_display" name="death_date_display"
+                 class="gedcom-date" placeholder="Klik om datum te kies…"
+                 value="{{ form.death_date.value|default:'' }}">
+          <input type="hidden" name="death_date" id="death_date"
+                 value="{{ form.death_date.value|default:'' }}">
+        </div>
+        <div class="fg"><label>Sterfplek</label>{{ form.death_place }}</div>
       </div>
-      <div class="fg"><label>Sterfplek</label>{{ form.death_place }}</div>
+      <div id="death-doc-section" style="display:none;">
+        <button type="button" onclick="toggleDocSection('death-doc-section', 'death-doc-content')" style="background:none;border:none;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:8px 0;margin-bottom:8px;">
+          + Voeg Doodsertifikaat by (Opsioneel)
+        </button>
+        <div id="death-doc-content" style="display:none;">
+          <div class="fg" style="margin-bottom:14px;">
+            <label>Lêer</label>
+            <input type="file" name="death_doc_file" id="death-doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
+            <div id="death-doc-preview" style="margin-top:10px;display:none;">
+              <canvas id="death-doc-canvas" style="max-width:200px;border:1px solid var(--border);border-radius:4px;"></canvas>
+              <img id="death-doc-img-preview" style="max-width:200px;max-height:150px;border:1px solid var(--border);border-radius:4px;display:none;">
+              <p id="death-doc-preview-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></p>
+            </div>
+          </div>
+          <div class="fg" style="margin-bottom:14px;">
+            <label>Dokumenttitel (opsioneel)</label>
+            <input type="text" name="death_doc_title" placeholder="Laat leeg vir outomatiese titel…">
+          </div>
+          <div class="fg" style="margin-bottom:14px;">
+            <label>Beskrywing (opsioneel)</label>
+            <textarea name="death_doc_description" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
     </div>
 
     <h3 style="margin-top:22px;margin-bottom:14px;">Biografie en aantekeninge</h3>
@@ -83,6 +144,19 @@
       <input type="text" name="note" placeholder="Kort beskrywing van hierdie wysiging…">
     </div>
 
+    {% if profile.is_admin %}
+    <div class="fg" style="margin-bottom:14px;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <input type="checkbox" name="is_root"
+               {% if person.is_root %}checked{% endif %}
+               style="width:16px;height:16px;">
+        <span>Stam-ouer van die boom <span style="font-family:monospace;font-size:12px;color:var(--muted);">(a1)</span></span>
+      </label>
+      <small style="color:var(--muted);display:block;margin-top:4px;">
+        Slegs een persoon moet as stam-ouer gemerk word. Henry-nommers word van hierdie persoon af bereken.
+      </small>
+    </div>
+    {% endif %}
     <div class="form-actions">
       <button type="submit" class="btn btn-primary">
         {% if live %}💾 Stoor{% else %}↑ Dien voorstel in{% endif %}
@@ -97,7 +171,67 @@
 </div>
 
 <script src="{% static 'genealogy/js/gedcom_datepicker.js' %}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
+  /* toggle death fields based on is_deceased checkbox */
+  const isDeceasedCheckbox = document.querySelector('input[name="is_deceased"]');
+  const deathFields = document.getElementById('death-fields');
+  const deathDocSection = document.getElementById('death-doc-section');
+
+  function toggleDeathFields() {
+    if (isDeceasedCheckbox && deathFields) {
+      const show = isDeceasedCheckbox.checked;
+      deathFields.style.display = show ? 'block' : 'none';
+      if (deathDocSection) {
+        deathDocSection.style.display = show ? 'block' : 'none';
+      }
+    }
+  }
+
+  if (isDeceasedCheckbox) {
+    isDeceasedCheckbox.addEventListener('change', toggleDeathFields);
+    // Show fields if already checked on page load
+    if (isDeceasedCheckbox.checked) {
+      toggleDeathFields();
+    }
+  }
+
+  /* toggle collapsible doc sections */
+  function toggleDocSection(sectionId, contentId) {
+    const section = document.getElementById(sectionId);
+    const content = document.getElementById(contentId);
+    if (section && content) {
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'block' : 'none';
+      section.style.display = 'block';
+    }
+  }
+
+  /* show birth doc button on load */
+  document.getElementById('birth-doc-section').style.display = 'block';
+
+  /* photo preview handler */
+  const photoInput = document.querySelector('input[name="photo"]');
+  if (photoInput) {
+    const photoPreview = document.getElementById('photo-preview');
+    const photoImgPrev = document.getElementById('photo-img-preview');
+    const photoNameEl = document.getElementById('photo-preview-name');
+
+    photoInput.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) { photoPreview.style.display = 'none'; return; }
+
+      photoNameEl.textContent = file.name;
+      photoPreview.style.display = 'block';
+
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function (e) { photoImgPrev.src = e.target.result; };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
   /* wire age display between birth and death pickers */
   const birthInp = document.getElementById('birth_date_display');
   const deathInp = document.getElementById('death_date_display');
@@ -111,5 +245,52 @@
 
   birthInp.addEventListener('change', refreshAge);
   deathInp.addEventListener('change', refreshAge);
+
+  /* document preview handlers */
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  function setupDocPreview(prefix) {
+    const input = document.getElementById(prefix + '-doc-file-input');
+    const preview = document.getElementById(prefix + '-doc-preview');
+    const canvas = document.getElementById(prefix + '-doc-canvas');
+    const imgPrev = document.getElementById(prefix + '-doc-img-preview');
+    const nameEl = document.getElementById(prefix + '-doc-preview-name');
+
+    if (!input) return;
+
+    input.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) { preview.style.display = 'none'; return; }
+
+      nameEl.textContent = file.name;
+      preview.style.display = 'block';
+
+      if (file.type === 'application/pdf') {
+        canvas.style.display = 'block';
+        imgPrev.style.display = 'none';
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          pdfjsLib.getDocument({ data: e.target.result }).promise.then(function (pdf) {
+            pdf.getPage(1).then(function (page) {
+              const viewport = page.getViewport({ scale: 0.5 });
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+            });
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (file.type.startsWith('image/')) {
+        canvas.style.display = 'none';
+        imgPrev.style.display = 'block';
+        const reader = new FileReader();
+        reader.onload = function (e) { imgPrev.src = e.target.result; };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  setupDocPreview('birth');
+  setupDocPreview('death');
 </script>
 {% endblock %}

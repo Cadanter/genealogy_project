@@ -44,7 +44,7 @@ class Person(models.Model):
     last_name   = models.CharField(max_length=100)
     maiden_name = models.CharField(max_length=100, blank=True)
     gender      = models.CharField(max_length=1, choices=GENDER_CHOICES, default='U')
-    photo       = models.ImageField(upload_to='persons/', blank=True, null=True)
+    photo       = models.ImageField(upload_to='people/photos/', blank=True, null=True)
 
     birth_date  = models.CharField(max_length=100, blank=True,
                     help_text='GEDCOM datum, bv. BEF 15 JAN 1900')
@@ -53,6 +53,7 @@ class Person(models.Model):
                     help_text='GEDCOM datum, bv. AFT 1950')
     death_place = models.CharField(max_length=200, blank=True)
     is_deceased = models.BooleanField(default=False)
+    is_root     = models.BooleanField(default=False, help_text='Stam-ouer van die boom (a1)')
 
     biography   = models.TextField(blank=True)
     notes       = models.TextField(blank=True)
@@ -67,7 +68,7 @@ class Person(models.Model):
     death_lng   = models.FloatField(null=True, blank=True)
 
     class Meta:
-        ordering = ['last_name', 'first_name']
+        ordering = ['first_name', 'last_name']
         verbose_name_plural = 'Mense'
 
     def __str__(self): return self.full_name
@@ -244,6 +245,12 @@ class Document(models.Model):
                       help_text='GEDCOM datum, bv. 12/08/1923 of BEF/AFT/EST/ABT 1900')
     source        = models.CharField(max_length=300, blank=True)
     people        = models.ManyToManyField(Person, related_name='documents', blank=True)
+    event         = models.ForeignKey('Event', on_delete=models.SET_NULL, null=True, blank=True,
+                      related_name='documents')
+    marriage      = models.ForeignKey('Marriage', on_delete=models.SET_NULL, null=True, blank=True,
+                      related_name='documents')
+    relationship  = models.ForeignKey('Relationship', on_delete=models.SET_NULL, null=True, blank=True,
+                      related_name='documents')
     created_at    = models.DateTimeField(auto_now_add=True)
     uploaded_by   = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
                       related_name='documents')
