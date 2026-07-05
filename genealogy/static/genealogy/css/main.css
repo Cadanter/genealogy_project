@@ -9,15 +9,15 @@
 
 /* ── Design tokens ─────────────────────────────────────────────────────── */
 :root {
-  --cream: #6e7376;
+  --cream: #4a3b34;
   --ink: #1c1710;
   --sepia: #7a5c2e;
   --gold: #f1ef83;
   --rust: #b5381e;
   --sage: #3d6b4f;
-  --muted: #c7bcb0;
-  --border: #6e7376;
-  --card: #9099a2;
+  --muted: #6e7376;
+  --border: #02146680;
+  --card: #3a3f45;
   --red-light: #fdf2f0;
   --sidebar-w: 248px;
 }
@@ -223,6 +223,7 @@ h3 {
   border: 1px solid var(--border);
   border-radius: 5px;
   padding: 22px;
+  margin-top: 0px;
   margin-bottom: 18px;
 }
 
@@ -273,7 +274,7 @@ h3 {
 
 .btn-primary {
   background: var(--ink);
-  color: var(--cream);
+  color: #a8a39a;
 }
 
 .btn-primary:hover {
@@ -426,37 +427,37 @@ textarea:focus {
 }
 
 .badge-trusted {
-  background: #dff0e6;
+  background: #75a8c5;
   color: #2a5c3a;
 }
 
 .badge-viewer {
-  background: #e8f0fb;
+  background: #85b887;
   color: #2c4f8a;
 }
 
 .badge-pending {
-  background: #fef3e2;
+  background: #b99968;
   color: #7a4f10;
 }
 
 .badge-male {
-  background: #dbeafe;
-  color: #1e3a8a;
+  background: #0c166e;
+  color: #8f9fcc;
 }
 
 .badge-female {
-  background: #fce7f3;
+  background: #c280a5;
   color: #831843;
 }
 
 .badge-deceased {
-  background: #f1f1f1;
+  background: #743434;
   color: #555;
 }
 
 .badge-alive {
-  background: #d1fae5;
+  background: #86c9a6;
   color: #065f46;
 }
 
@@ -502,7 +503,7 @@ textarea:focus {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 22px;
+  margin-bottom: 5px;
 }
 
 .ph-actions {
@@ -529,6 +530,7 @@ textarea:focus {
   flex-direction: column;
   gap: 5px;
   transition: all .12s;
+  justify-content: space-between;
 }
 
 .pcard:hover {
@@ -575,6 +577,11 @@ textarea:focus {
 
 .ir-value {
   font-size: 13.5px;
+}
+
+.ir-value a {
+  color: #2b2b2b;
+  text-decoration: none;
 }
 
 .avatar-ph {

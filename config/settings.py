@@ -1,10 +1,11 @@
 from pathlib import Path
+from decouple import config, Csv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = ''
-DEBUG = True
-ALLOWED_HOSTS = ['*']
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = config('DEBUG', default=True, cast=bool)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='', cast=Csv())
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -50,8 +51,8 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE':   'django.db.backends.sqlite3',
+        'NAME':     BASE_DIR / 'db.sqlite3',
     }
 }
 

@@ -10,7 +10,7 @@
 <div class="ph"><div><h2>Familiekaart</h2><p class="subtitle">{{ people_count }} mense met bekende liggings</p></div></div>
 <div class="card" style="padding:14px 20px;">
   <div class="legend">
-    <span><span class="legend-dot" style="background:#3d6b4f"></span>Geboorteplek</span>
+    <span><span class="legend-dot" style="background:#5cd152"></span>Geboorteplek</span>
     <span><span class="legend-dot" style="background:#1c1710"></span>Sterfplek</span>
   </div>
   <div id="status" style="font-size:12.5px;color:var(--muted);">Laai tans…</div>
@@ -29,7 +29,7 @@ const mkDot = c => L.divIcon({
   html: `<div style="width:11px;height:11px;border-radius:50%;background:${c};border:2px solid white;box-shadow:0 1px 4px rgba(0,0,0,.3)"></div>`,
   iconSize: [11, 11], iconAnchor: [5, 5]
 });
-const birthDot = mkDot('#3d6b4f'), deathDot = mkDot('#1c1710');
+const birthDot = mkDot('#5cd152'), deathDot = mkDot('#1c1710');
 const markers = L.layerGroup().addTo(map), cache = {}, bounds = [];
 async function geocode(place) {
   if (!place) return null;

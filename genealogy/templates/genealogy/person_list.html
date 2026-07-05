@@ -59,7 +59,7 @@
       {% if p.is_deceased and p.death_date %} – gest. {{ p.death_year }}{% endif %}
     </div>
     {% if p.birth_place %}<div style="font-size:11.5px;color:var(--muted);">{{ p.birth_place }}</div>{% endif %}
-    <span class="badge badge-{% if p.gender == 'M' %}male{% elif p.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;align-self:flex-start;">
+    <span class="badge badge-{% if p.gender == 'M' %}male{% elif p.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:auto;align-self:flex-start;">
       {{ p.get_gender_display }}
     </span>
   </a>
