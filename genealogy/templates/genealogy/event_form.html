@@ -19,7 +19,8 @@
       <div class="fg" style="margin-bottom:14px;position:relative;">
         <label>{{ field.label }}</label>
         <input type="text" id="{{ field.name }}_display" name="{{ field.name }}_display"
-               class="gedcom-date" placeholder="Klik om datum te kies…">
+               class="gedcom-date" placeholder="Klik om datum te kies…"
+               value="{{ event_date_display }}">
         <input type="hidden" name="{{ field.name }}" id="{{ field.name }}" value="{{ field.value|default:'' }}">
       </div>
       {% else %}

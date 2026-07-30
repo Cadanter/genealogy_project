@@ -7,6 +7,19 @@ from django.utils import timezone
 from .models import Post, Category, Tag, Comment
 from .forms import CommentForm, PostForm
 
+def _can_comment(user):
+    """Returns True if user is allowed to comment — approved genealogy members or staff."""
+    if not user.is_authenticated:
+        return False
+    if user.is_staff:
+        return True
+    try:
+        from genealogy.models import UserProfile
+        profile = user.profile
+        return profile.is_approved
+    except Exception:
+        return False
+
 
 def post_list(request):
     posts = Post.objects.filter(status='published').select_related('author', 'category')
@@ -39,6 +52,9 @@ def post_detail(request, slug):
     form = CommentForm()
 
     if request.method == 'POST':
+        if not _can_comment(request.user):
+            messages.error(request, 'Slegs goedgekeurde lede kan kommentaar lewer.')
+            return redirect('blog:post_detail', slug=slug)
         form = CommentForm(request.POST)
         if form.is_valid():
             comment = form.save(commit=False)
@@ -52,9 +68,11 @@ def post_detail(request, slug):
         status='published', category=post.category
     ).exclude(pk=post.pk)[:3] if post.category else []
 
+    can_comment = _can_comment(request.user)
     return render(request, 'blog/post_detail.html', {
         'post': post, 'comments': comments,
         'form': form, 'related': related,
+        'can_comment': can_comment,
     })
 
 

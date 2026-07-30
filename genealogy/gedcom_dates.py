@@ -116,33 +116,50 @@ def gedcom_to_display(gedcom_str):
 def calc_age(birth_gedcom, death_gedcom):
     """
     Return an Afrikaans age string from two GEDCOM date strings.
+    Uses today's date if no death date is provided (living person).
     Returns 'Onbekend' whenever exact calculation is impossible.
     """
-    if not birth_gedcom or not death_gedcom:
+    from datetime import date as _date
+    today = _date.today()
+
+    if not birth_gedcom:
         return 'Onbekend'
 
     bp = parse_gedcom_date(birth_gedcom)
-    dp = parse_gedcom_date(death_gedcom)
-
-    if not bp or not dp:
+    if not bp:
         return 'Onbekend'
-    if bp.get('modifier') == 'UNK' or dp.get('modifier') == 'UNK':
+    if bp.get('modifier') == 'UNK':
         return 'Onbekend'
-    if not bp.get('year') or not dp.get('year'):
+    if not bp.get('year'):
         return 'Onbekend'
 
-    by, dy = bp['year'], dp['year']
-    approx = bp.get('modifier') != 'EXACT' or dp.get('modifier') != 'EXACT'
-    prefix = '± ' if approx else ''
+    # Use death date if provided, otherwise use today
+    living = not death_gedcom
+    if death_gedcom:
+        dp = parse_gedcom_date(death_gedcom)
+        if not dp or dp.get('modifier') == 'UNK' or not dp.get('year'):
+            return 'Onbekend'
+        dy      = dp['year']
+        d_month = dp.get('month')
+        d_day   = dp.get('day')
+        approx  = bp.get('modifier') != 'EXACT' or dp.get('modifier') != 'EXACT'
+    else:
+        dy      = today.year
+        d_month = today.month
+        d_day   = today.day
+        approx  = bp.get('modifier') != 'EXACT'
 
-    if not bp.get('month') or not dp.get('month') or \
-       not bp.get('day') or not dp.get('day'):
-        return f'{prefix}± {dy - by} jaar (benaderd)'
+    by     = bp['year']
+    prefix = 'ongeveer ' if approx else ''
 
-    from datetime import date
+    # If we lack full dates, return year-based approximation
+    if not bp.get('month') or not bp.get('day') or not d_month or not d_day:
+        age_approx = dy - by
+        return f'{prefix}{age_approx} jaar (benaderd)'
+
     try:
-        bd = date(by, bp['month'], bp['day'])
-        dd = date(dy, dp['month'], dp['day'])
+        bd = _date(by, bp['month'], bp['day'])
+        dd = _date(dy, d_month, d_day)
     except ValueError:
         return 'Onbekend'
 
@@ -151,4 +168,7 @@ def calc_age(birth_gedcom, death_gedcom):
         age -= 1
     if age < 0:
         return 'Onbekend'
+
+    if living:
+        return f'{prefix}{age} jaar (lewend)'
     return f'{prefix}{age} jaar'

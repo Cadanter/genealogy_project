@@ -56,7 +56,7 @@ class Post(models.Model):
         ('both', 'Beide / Both'),
     ]
 
-    title       = models.CharField(max_length=200)
+    title       = models.CharField(max_length=200, blank=True)
     title_af    = models.CharField(max_length=200, blank=True, verbose_name='Titel (Afrikaans)')
     slug        = models.SlugField(unique=True, max_length=220)
     author      = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='posts')
@@ -64,7 +64,7 @@ class Post(models.Model):
     tags        = models.ManyToManyField(Tag, blank=True, related_name='posts')
 
     # Content — primary and optional Afrikaans version
-    body        = models.TextField()
+    body        = models.TextField(blank=True)
     body_af     = models.TextField(blank=True, verbose_name='Inhoud (Afrikaans)')
 
     excerpt     = models.TextField(blank=True, help_text='Short summary shown on the list page')
@@ -82,11 +82,12 @@ class Post(models.Model):
         ordering = ['-published_at', '-created_at']
 
     def __str__(self):
-        return self.title
+        return self.title or self.title_af or '(Sonder titel)'
 
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            base = self.title or self.title_af or 'plasing'
+            self.slug = slugify(base)
         super().save(*args, **kwargs)
 
     def get_absolute_url(self):

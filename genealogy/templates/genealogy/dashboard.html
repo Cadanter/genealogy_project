@@ -72,7 +72,7 @@
     {% for p in recent_people %}
     <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
       <a href="{{ p.get_absolute_url }}" style="font-family:'EB Garamond',serif;font-size:15px;color:var(--sepia);text-decoration:none;">{{ p.full_name }}</a>
-      <span style="font-size:11.5px;color:var(--muted);">{% if p.birth_date %}geb. {{ p.birth_date.year }}{% endif %}</span>
+      <span style="font-size:11.5px;color:var(--muted);">{% if p.birth_date %}geb. {{ p.birth_year }}{% endif %}</span>
     </div>
     {% empty %}
     <p style="color:var(--muted);font-size:13px;">Nog geen mense nie. <a href="{% url 'genealogy:person_create' %}" style="color:var(--sepia);">Voeg die eerste een by.</a></p>

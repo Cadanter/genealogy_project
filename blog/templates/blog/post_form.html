@@ -6,20 +6,79 @@
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:5px;padding:28px;">
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
+      {% if form.non_field_errors %}
+      <div style="background:#fde8e8;border:1px solid #e57373;border-radius:6px;padding:12px;margin-bottom:16px;">
+        {% for error in form.non_field_errors %}
+          <p style="color:#c0392b;margin:0;">{{ error }}</p>
+        {% endfor %}
+      </div>
+      {% endif %}
       <div class="form-grid">
-        <div class="fg"><label>Titel (Engels)</label>{{ form.title }}{% if form.title.errors %}<small style="color:var(--rust)">{{ form.title.errors|join:", " }}</small>{% endif %}</div>
-        <div class="fg"><label>Titel (Afrikaans)</label>{{ form.title_af }}</div>
-        <div class="fg"><label>Skakel / Slug</label>{{ form.slug }}</div>
+
+        <!-- Titles -->
+        <div class="fg" id="section-title-en">
+          <label>Titel (Engels / English)</label>
+          {{ form.title }}
+          {% if form.title.errors %}<small style="color:var(--rust)">{{ form.title.errors|join:", " }}</small>{% endif %}
+        </div>
+        <div class="fg" id="section-title-af">
+          <label>Titel (Afrikaans)</label>
+          {{ form.title_af }}
+        </div>
+
+        <!-- Slug -->
+        <div class="fg">
+          <label>Skakel (Slug)</label>
+          {{ form.slug }}
+          <small style="color:var(--muted);display:block;margin-top:4px;">
+            Word outomaties gegenereer vanaf die titel. Gebruik kleinletters, getalle en koppeltekens slegs.
+            Voorbeeld: <em>my-eerste-plasing</em> of <em>thoughts-on-family-history</em>
+          </small>
+          {% if form.slug.errors %}<small style="color:var(--rust)">{{ form.slug.errors|join:", " }}</small>{% endif %}
+        </div>
+
+        <!-- Category, Language, Status -->
         <div class="fg"><label>Kategorie / Category</label>{{ form.category }}</div>
-        <div class="fg"><label>Taal / Language</label>{{ form.language }}</div>
+        <div class="fg">
+          <label>Taal / Language</label>
+          {{ form.language }}
+          <small style="color:var(--muted);display:block;margin-top:4px;">
+            Kies watter inhoud jy wil invul — net Afrikaans, net Engels, of beide.
+          </small>
+        </div>
         <div class="fg"><label>Status</label>{{ form.status }}</div>
         <div class="fg"><label>Gepubliseer op / Published at</label>{{ form.published_at }}</div>
         <div class="fg"><label>Voorblad / Cover image</label>{{ form.cover_image }}</div>
-        <div class="fg full"><label>Uittreksel (Engels) / Excerpt</label>{{ form.excerpt }}</div>
-        <div class="fg full"><label>Uittreksel (Afrikaans)</label>{{ form.excerpt_af }}</div>
-        <div class="fg full"><label>Inhoud (Engels) / Body</label>{{ form.body }}{% if form.body.errors %}<small style="color:var(--rust)">{{ form.body.errors|join:", " }}</small>{% endif %}</div>
-        <div class="fg full"><label>Inhoud (Afrikaans)</label>{{ form.body_af }}</div>
-        <div class="fg full"><label>Etikette / Tags</label><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;">{{ form.tags }}</div></div>
+
+        <!-- Excerpts -->
+        <div class="fg full" id="section-excerpt-en">
+          <label>Uittreksel (Engels) / Excerpt</label>
+          {{ form.excerpt }}
+          <small style="color:var(--muted);">Kort opsomming wat op die lysblad gewys word.</small>
+        </div>
+        <div class="fg full" id="section-excerpt-af">
+          <label>Uittreksel (Afrikaans)</label>
+          {{ form.excerpt_af }}
+        </div>
+
+        <!-- Body content -->
+        <div class="fg full" id="section-body-en">
+          <label>Inhoud (Engels) / Body</label>
+          {{ form.body }}
+          {% if form.body.errors %}<small style="color:var(--rust)">{{ form.body.errors|join:", " }}</small>{% endif %}
+        </div>
+        <div class="fg full" id="section-body-af">
+          <label>Inhoud (Afrikaans)</label>
+          {{ form.body_af }}
+          {% if form.body_af.errors %}<small style="color:var(--rust)">{{ form.body_af.errors|join:", " }}</small>{% endif %}
+        </div>
+
+        <!-- Tags -->
+        <div class="fg full">
+          <label>Etikette / Tags</label>
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:4px;">{{ form.tags }}</div>
+        </div>
+
       </div>
       <div class="form-actions">
         <button type="submit" class="btn btn-primary">💾 Stoor / Save</button>
@@ -29,4 +88,46 @@
     </form>
   </div>
 </div>
+
+<script>
+(function() {
+  var langSel   = document.querySelector('select[name="language"]');
+  var titleSel  = document.getElementById('id_title');
+  var slugField = document.getElementById('id_slug');
+  var slugEdited = slugField.value !== '';
+
+  // Auto-generate slug from English title
+  titleSel.addEventListener('input', function() {
+    if (!slugEdited) {
+      slugField.value = this.value
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, '')
+        .replace(/[\s_]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+    }
+  });
+
+  slugField.addEventListener('input', function() {
+    slugEdited = this.value !== '';
+  });
+
+  // Show/hide sections based on language
+  var enSections = ['section-title-en', 'section-excerpt-en', 'section-body-en'];
+  var afSections = ['section-title-af', 'section-excerpt-af', 'section-body-af'];
+
+  function updateSections() {
+    var lang = langSel.value;
+    enSections.forEach(function(id) {
+      document.getElementById(id).style.display = (lang === 'af') ? 'none' : '';
+    });
+    afSections.forEach(function(id) {
+      document.getElementById(id).style.display = (lang === 'en') ? 'none' : '';
+    });
+  }
+
+  langSel.addEventListener('change', updateSections);
+  updateSections();
+})();
+</script>
 {% endblock %}

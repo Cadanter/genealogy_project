@@ -87,7 +87,8 @@ def extract_individuals(records):
             continue
         indi = {'xref': xref, 'given': '', 'surname': '', 'sex': 'U',
                 'birth_date': None, 'birth_place': '', 'death_date': None,
-                'death_place': '', 'is_deceased': False, 'notes': ''}
+                'death_place': '', 'is_deceased': False, 'notes': '',
+                'henry': '', 'is_root': False}
         in_birt = in_deat = False
         for level, tag, value in rec['_lines']:
             if level == '1':
@@ -104,16 +105,20 @@ def extract_individuals(records):
                     indi['is_deceased'] = True
                 elif tag in ('NOTE', 'CONC', 'CONT'):
                     indi['notes'] += value + ' '
+                elif tag == '_HENRY':
+                    indi['henry'] = value.strip()
+                elif tag == '_ROOT':
+                    indi['is_root'] = value.strip().upper() == 'Y'
             elif level == '2':
                 if in_birt:
                     if tag == 'DATE':
-                        indi['birth_date'] = parse_gedcom_date(value)
+                        indi['birth_date'] = value.strip()
                     elif tag == 'PLAC':
                         indi['birth_place'] = value
                 elif in_deat:
                     indi['is_deceased'] = True
                     if tag == 'DATE':
-                        indi['death_date'] = parse_gedcom_date(value)
+                        indi['death_date'] = value.strip()
                     elif tag == 'PLAC':
                         indi['death_place'] = value
         individuals[xref] = indi
@@ -127,7 +132,7 @@ def extract_families(records):
         if rec['_tag'] != 'FAM':
             continue
         fam = {'husb': None, 'wife': None, 'children': [],
-               'marr_date': None, 'marr_place': ''}
+               'marr_date': '', 'marr_place': '', 'status': 'married'}
         in_marr = False
         for level, tag, value in rec['_lines']:
             if level == '1':
@@ -138,9 +143,12 @@ def extract_families(records):
                     fam['wife'] = value
                 elif tag == 'CHIL':
                     fam['children'].append(value)
+                elif tag == '_STATUS':
+                    fam['status'] = value.strip()
             elif level == '2' and in_marr:
                 if tag == 'DATE':
-                    fam['marr_date'] = parse_gedcom_date(value)
+                    # Store as raw GEDCOM string, not parsed date
+                    fam['marr_date'] = value.strip()
                 elif tag == 'PLAC':
                     fam['marr_place'] = value
         families.append(fam)
@@ -185,13 +193,14 @@ class Command(BaseCommand):
                 middle_name=middle,
                 last_name=i['surname'] or 'Unknown',
                 gender=i['sex'] if i['sex'] in ('M', 'F') else 'U',
-                birth_date=i['birth_date'],
-                birth_place=i['birth_place'],
-                death_date=i['death_date'],
-                death_place=i['death_place'],
+                birth_date=i['birth_date'] or '',
+                birth_place=i['birth_place'] or '',
+                death_date=i['death_date'] or '',
+                death_place=i['death_place'] or '',
                 is_deceased=i['is_deceased'],
                 notes=i['notes'].strip(),
-                owner=user,
+                is_root=i.get('is_root', False),
+                created_by=user,
             )
             xref_to_pk[xref] = person.pk
             created += 1
@@ -210,21 +219,25 @@ class Command(BaseCommand):
                     person1=p1, person2=p2,
                     marriage_date=fam['marr_date'],
                     marriage_place=fam['marr_place'],
+                    status=fam.get('status', 'married'),
                 )
                 marriages_created += 1
 
-            parent_pk = husb_pk or wife_pk
-            if parent_pk:
-                parent = Person.objects.get(pk=parent_pk)
-                for child_xref in fam['children']:
-                    child_pk = xref_to_pk.get(child_xref)
-                    if child_pk:
-                        child = Person.objects.get(pk=child_pk)
-                        Relationship.objects.get_or_create(
+            # Link children to BOTH parents
+            for child_xref in fam['children']:
+                child_pk = xref_to_pk.get(child_xref)
+                if not child_pk:
+                    continue
+                child = Person.objects.get(pk=child_pk)
+                for parent_pk in [husb_pk, wife_pk]:
+                    if parent_pk:
+                        parent = Person.objects.get(pk=parent_pk)
+                        _, created = Relationship.objects.get_or_create(
                             person=parent, relative=child,
                             defaults={'relationship_type': 'parent'}
                         )
-                        relationships_created += 1
+                        if created:
+                            relationships_created += 1
 
         self.stdout.write(self.style.SUCCESS(
             f'✓ Imported {created} people, {marriages_created} marriages, {relationships_created} parent–child links.'

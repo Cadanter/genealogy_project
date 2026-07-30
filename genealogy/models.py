@@ -83,6 +83,18 @@ class Person(models.Model):
     def get_absolute_url(self):
         return reverse('genealogy:person_detail', kwargs={'pk': self.pk})
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.photo:
+            try:
+                from PIL import Image
+                img = Image.open(self.photo.path)
+                if img.width > 800 or img.height > 800:
+                    img.thumbnail((800, 800))
+                    img.save(self.photo.path, optimize=True, quality=85)
+            except Exception:
+                pass  # Never block saving due to image processing
+
     def get_parents(self):
         return [r.person for r in self.child_relationships.filter(relationship_type='parent')]
 
@@ -148,7 +160,7 @@ class Relationship(models.Model):
         unique_together = ('person', 'relative', 'relationship_type')
 
     def __str__(self):
-        return f'{self.person} is {self.get_relationship_type_display()} of {self.relative}'
+        return f'{self.person} is {self.get_relationship_type_display()} van {self.relative}'
 
     def get_absolute_url(self):
         return reverse('genealogy:relationship_detail', kwargs={'pk': self.pk})
@@ -286,6 +298,8 @@ class Event(models.Model):
                     help_text='GEDCOM datum, bv. 12/08/1923 of BEF/AFT/EST/ABT 1900')
     place       = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
+    main_person = models.ForeignKey(Person, on_delete=models.SET_NULL, null=True, blank=True,
+                    related_name='main_events', help_text='Hoofpersoon waaraan die dokument gekoppel word')
     people      = models.ManyToManyField(Person, related_name='events', blank=True)
 
     class Meta:

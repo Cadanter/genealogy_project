@@ -7,6 +7,7 @@
   <title>Danie van Eeden</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{% static 'core/img/logo.png' %}">
   <link rel="stylesheet" href="{% static 'core/css/landing.css' %}">
 </head>
 <body>
@@ -44,6 +45,18 @@
         <em style="font-size:12px;color:#5a5040">'n Gedeelde rekord van die van Eeden-familie oor geslagte heen.</em>
       </p>
       <span class="card-arrow">Besoek argief →</span>
+    </a>
+
+    <a href="{% url 'user_manual' %}" class="project-card">
+      <span class="card-icon">📖</span>
+      <div class="card-title">User Manual</div>
+      <div class="card-title-af">Gebruikershandleiding</div>
+      <p class="card-desc">
+        A guide to using the Van Eeden Family Archive — for viewers and editors alike.
+        <br><br>
+        <em style="font-size:12px;color:#5a5040">'n Gids tot die gebruik van die Van Eeden Familiegeskiedenisargief.</em>
+      </p>
+      <span class="card-arrow">Lees handleiding →</span>
     </a>
 
     <a href="{% url 'blog:post_list' %}" class="project-card blog">

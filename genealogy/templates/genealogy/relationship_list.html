@@ -1,4 +1,5 @@
 {% extends "genealogy/base.html" %}
+{% load genealogy_extras %}
 {% block title %}Verhoudings — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Verhoudings{% endblock %}
 {% block topbar_actions %}
@@ -15,8 +16,32 @@
   <tbody>
     {% for m in relationships %}
     <tr>
-      <td><a href="{{ m.person.get_absolute_url }}">{{ m.person.full_name }}</a></td>
-      <td><a href="{{ m.relative.get_absolute_url }}">{{ m.relative.full_name }}</a></td>
+      <td>
+        {% if henry_map %}
+          {% with henry=henry_map|get_item:m.person.pk %}
+            {% if henry %}
+              <div style="font-size:10.5px;color:var(--muted);font-family:monospace;margin-bottom:2px;">{{ henry }}</div>
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+        <a href="{{ m.person.get_absolute_url }}">{{ m.person.full_name }}</a>
+        {% if m.person.maiden_name %}
+          <div style="font-size:11px;color:var(--muted);">(nee {{ m.person.maiden_name }})</div>
+        {% endif %}
+      </td>
+      <td>
+        {% if henry_map %}
+          {% with henry=henry_map|get_item:m.relative.pk %}
+            {% if henry %}
+              <div style="font-size:10.5px;color:var(--muted);font-family:monospace;margin-bottom:2px;">{{ henry }}</div>
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+        <a href="{{ m.relative.get_absolute_url }}">{{ m.relative.full_name }}</a>
+        {% if m.relative.maiden_name %}
+          <div style="font-size:11px;color:var(--muted);">(nee {{ m.relative.maiden_name }})</div>
+        {% endif %}
+      </td>
       <td><span class="badge badge-viewer">{{ m.get_relationship_type_display }}</span></td>
       <td style="white-space:nowrap;">
         <a href="{% url 'genealogy:relationship_detail' m.pk %}" class="btn btn-secondary btn-sm">Sien</a>

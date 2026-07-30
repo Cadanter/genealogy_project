@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'blog/css/blog.css' %}">
+  <link rel="icon" type="image/png" href="{% static 'core/img/logo.png' %}">
   {% block extra_css %}{% endblock %}
 </head>
 <body>
@@ -16,7 +17,7 @@
   <a href="/" class="topnav-brand">Danie van Eeden</a>
   <div class="topnav-links">
     <a href="/" style="font-weight: 600; text-decoration: none; font-size: 0.9rem; color: var(--text);">Voorblad</a>
-    <a href="{% url 'genealogy:person_list' %}" style="color: var(--text);">Argief</a>
+    <a href="/argief/" style="color: var(--text);">Argief</a>
     <a href="{% url 'blog:post_list' %}" class="{% if 'blog' in request.resolver_match.namespace %}active{% endif %}">Blog</a>
     {% if user.is_authenticated and user.is_staff %}
       <a href="{% url 'blog:post_create' %}" style="color:var(--gold);">+ Nuwe plasing</a>

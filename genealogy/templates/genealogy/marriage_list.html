@@ -1,4 +1,5 @@
 {% extends "genealogy/base.html" %}
+{% load genealogy_extras %}
 {% block title %}Huwelike — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Huwelike{% endblock %}
 {% block topbar_actions %}
@@ -15,8 +16,32 @@
   <tbody>
     {% for m in marriages %}
     <tr>
-      <td><a href="{{ m.person1.get_absolute_url }}">{{ m.person1.full_name }}</a></td>
-      <td><a href="{{ m.person2.get_absolute_url }}">{{ m.person2.full_name }}</a></td>
+      <td>
+        {% if henry_map %}
+          {% with henry=henry_map|get_item:m.person1.pk %}
+            {% if henry %}
+              <div style="font-size:10.5px;color:var(--muted);font-family:monospace;margin-bottom:2px;">{{ henry }}</div>
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+        <a href="{{ m.person1.get_absolute_url }}">{{ m.person1.full_name }}</a>
+        {% if m.person1.maiden_name %}
+          <div style="font-size:11px;color:var(--muted);">(nee {{ m.person1.maiden_name }})</div>
+        {% endif %}
+      </td>
+      <td>
+        {% if henry_map %}
+          {% with henry=henry_map|get_item:m.person2.pk %}
+            {% if henry %}
+              <div style="font-size:10.5px;color:var(--muted);font-family:monospace;margin-bottom:2px;">{{ henry }}</div>
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+        <a href="{{ m.person2.get_absolute_url }}">{{ m.person2.full_name }}</a>
+        {% if m.person2.maiden_name %}
+          <div style="font-size:11px;color:var(--muted);">(nee {{ m.person2.maiden_name }})</div>
+        {% endif %}
+      </td>
       <td>{{ m.marriage_date|default:"—" }}</td>
       <td>{{ m.marriage_place|default:"—" }}</td>
       <td><span class="badge badge-viewer">{{ m.get_status_display }}</span></td>

@@ -1,4 +1,5 @@
 {% extends "genealogy/base.html" %}
+{% load genealogy_extras %}
 {% block title %}{{ marriage }} — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}
   <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
@@ -76,9 +77,22 @@ window._pdfjsLib = pdfjsLib;
   <div>
     <div class="card" style="margin-top: 21px;">
       <div class="info-row"><div class="ir-label">Persoon 1</div>
-        <div class="ir-value"><a href="{{ marriage.person1.get_absolute_url }}">{{ marriage.person1.full_name }}</a></div></div>
+        <div class="ir-value" style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <a href="{{ marriage.person1.get_absolute_url }}">{{ marriage.person1.full_name }}</a>
+            <span style="margin-left: 4px;">({{ marriage.person1.gender|default:"—" }})</span>
+          </div>
+          {% if henry1 %}
+            <div style="font-family:monospace;">{{ henry1 }}</div>
+          {% endif %}
+        </div>
+      </div>
       <div class="info-row"><div class="ir-label">Persoon 2</div>
-        <div class="ir-value"><a href="{{ marriage.person2.get_absolute_url }}">{{ marriage.person2.full_name }}</a></div></div>
+        <div class="ir-value">
+          <a href="{{ marriage.person2.get_absolute_url }}">{{ marriage.person2.full_name }}</a>
+          <span style="margin-left: 4px;">({{ marriage.person2.gender|default:"—" }})</span>
+        </div>
+      </div>
       <div class="info-row"><div class="ir-label">Huweliksdatum</div>
         <div class="ir-value">{{ marriage.marriage_date_display|default:"—" }}</div></div>
       <div class="info-row"><div class="ir-label">Huweliksplek</div>

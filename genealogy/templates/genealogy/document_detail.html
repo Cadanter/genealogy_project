@@ -56,8 +56,8 @@
     <div class="viewer">
       <div class="preview-pane">
         <div class="preview-toolbar">
-          <button id="prevPageBtn" type="button">← Previous</button>
-          <button id="nextPageBtn" type="button">Next →</button>
+          <button id="prevPageBtn" type="button">← Vorige</button>
+          <button id="nextPageBtn" type="button">Volgende →</button>
           <button id="zoomOutBtn" type="button">− Zoom</button>
           <select id="zoomSelect">
             <option value="0.75">75%</option>
@@ -68,13 +68,13 @@
           </select>
           <button id="zoomInBtn" type="button">+ Zoom</button>
         </div>
-        <div id="preview">No preview yet.</div>
+        <div id="preview">Nog geen voorskou beskikbaar nie.</div>
         <div id="pageInfo" class="page-info"></div>
       </div>
 
       <div class="thumb-pane">
         <strong>Pages</strong>
-        <div id="thumbnails">No thumbnails yet.</div>
+        <div id="thumbnails">Nog geen duimnaels beskikbaar nie.</div>
       </div>
     </div>
   {% endif %}
@@ -214,8 +214,8 @@
         return;
       }
 
-      preview.innerHTML = "Loading page...";
-      pageInfo.textContent = `Loading page ${pageNumber}...`;
+      preview.innerHTML = "Laai tans...";
+      pageInfo.textContent = `Laai tans bladsy ${pageNumber}...`;
 
       try {
         const page = await pdfDoc.getPage(pageNumber);
@@ -229,7 +229,7 @@
 
         preview.innerHTML = "";
         preview.appendChild(canvas);
-        pageInfo.textContent = `Page ${pageNumber} of ${pdfDoc.numPages}`;
+        pageInfo.textContent = `Bladsy ${pageNumber} van ${pdfDoc.numPages}`;
         currentPageNumber = pageNumber;
         updatePageButtons();
 
@@ -237,16 +237,16 @@
           card.classList.toggle("active", Number(card.dataset.pageNumber) === pageNumber);
         });
       } catch (error) {
-        preview.textContent = "Failed to render page.";
-        pageInfo.textContent = "Unable to display this page.";
+        preview.textContent = "Kon nie bladsy laai nie.";
+        pageInfo.textContent = "Kan nie bladsy vertoon nie.";
         console.error(error);
       }
     }
 
     async function loadPdf() {
-      preview.innerHTML = "Loading PDF...";
+      preview.innerHTML = "Laai PDF...";
       pageInfo.textContent = "";
-      thumbnails.innerHTML = "Loading thumbnails...";
+      thumbnails.innerHTML = "Laai duimnaels...";
 
       try {
         const pdfUrl = '{{ document.file.url }}';
@@ -280,7 +280,7 @@
 
           const label = document.createElement("div");
           label.className = "page-label";
-          label.textContent = `Page ${pageNumber}`;
+          label.textContent = `Bladsy ${pageNumber}`;
           card.appendChild(label);
 
           card.addEventListener("click", () => {
@@ -292,9 +292,9 @@
 
         await renderPage(1);
       } catch (error) {
-        preview.textContent = "Failed to load PDF.";
+        preview.textContent = "Kon nie PDF laai nie.";
         pageInfo.textContent = "";
-        thumbnails.textContent = "Failed to render thumbnails.";
+        thumbnails.textContent = "Kan nie duimnaels vertoon nie.";
         console.error(error);
       }
     }

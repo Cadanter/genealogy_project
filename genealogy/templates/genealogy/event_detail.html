@@ -74,7 +74,7 @@ window._pdfjsLib = pdfjsLib;
     {% endfor %}
   </div>
   <div>
-    <div class="card" style="margin-top: 21px;">
+    <div class="card">
       <div class="info-row"><div class="ir-label">Datum</div>
         <div class="ir-value">{{ event.date_display|default:"—" }}</div></div>
       <div class="info-row"><div class="ir-label">Plek</div>
@@ -84,16 +84,28 @@ window._pdfjsLib = pdfjsLib;
         <div class="ir-value">{{ event.description|linebreaksbr }}</div></div>
       {% endif %}
     </div>
-    {% if event.people.exists %}
+    {% if main_person %}
     <div class="card">
-      <h3 style="margin-bottom:10px;">Verwante Mense</h3>
+      <h3 style="margin-bottom:10px;">Hoofpersoon</h3>
       <div class="family-list">
-        {% for person in event.people.all %}
-          <a href="{{ person.get_absolute_url }}" class="flink">⊙ {{ person.full_name }}</a>
+        <a href="{{ main_person.get_absolute_url }}" class="flink">⊙ {{ main_person.full_name }}</a>
+      </div>
+    </div>
+    {% endif %}
+    {% with others=event.people.all %}
+    {% if others %}
+    <div class="card">
+      <h3 style="margin-bottom:10px;">Mense van Belang</h3>
+      <div class="family-list">
+        {% for person in others %}
+          {% if not main_person or person.pk != main_person.pk %}
+            <a href="{{ person.get_absolute_url }}" class="flink">⊙ {{ person.full_name }}</a>
+          {% endif %}
         {% endfor %}
       </div>
     </div>
     {% endif %}
+    {% endwith %}
   </div>
 </div>
 {% endblock %}

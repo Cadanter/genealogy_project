@@ -1,4 +1,5 @@
 {% extends "genealogy/base.html" %}
+{% load genealogy_extras %}
 {% block title %}{{ title|default:"Verhouding" }} — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}
   <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
@@ -12,8 +13,34 @@
 <div class="card" style="max-width:580px;">
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
 
-    {% include "genealogy/_person_picker_single.html" with field_name="person" label="Ouer" selected_person=relationship.person %}
-    {% include "genealogy/_person_picker_single.html" with field_name="relative" label="Kind" selected_person=relationship.relative %}
+    {% include "genealogy/_person_picker_single.html" with field_name="person" label="Ouer" selected_person=relationship.person henry_map=henry_map %}
+    <!-- Kind picker with unconnected filter -->
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Kind</label>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="relative-search" placeholder="Soek naam…" style="flex:1;" autocomplete="off">
+        <button type="button" class="btn btn-secondary" onclick="spOpenRelative('all')">Kies (Almal)</button>
+        <button type="button" class="btn btn-secondary" onclick="spOpenRelative('unconnected')">Kies (Onverbind)</button>
+      </div>
+      <div id="relative-selected" style="margin-bottom:8px;">
+        {% if relationship.relative %}
+        <div class="pcard" style="min-width:140px;max-width:220px;cursor:default;position:relative;">
+          <div class="pcard-name">{{ relationship.relative.full_name }}</div>
+          <div class="pcard-dates" style="font-size:11px;">
+            {% if relationship.relative.birth_date %}geb. {{ relationship.relative.birth_year }}{% endif %}
+            {% if relationship.relative.is_deceased and relationship.relative.death_date %} – gest. {{ relationship.relative.death_year }}{% endif %}
+          </div>
+          {% if relationship.relative.birth_place %}
+            <div style="font-size:11px;color:var(--muted);">{{ relationship.relative.birth_place }}</div>
+          {% endif %}
+          <span class="badge badge-{% if relationship.relative.gender == 'M' %}male{% elif relationship.relative.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;">{{ relationship.relative.get_gender_display }}</span>
+          <button type="button" onclick="spClear('relative')"
+                  style="position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);">✕</button>
+        </div>
+        {% endif %}
+      </div>
+      <input type="hidden" name="relative" id="relative-value" value="{{ relationship.relative.pk|default:'' }}">
+    </div>
 
     <div class="fg" style="margin-bottom:14px;">
       <label>{{ form.relationship_type.label }}</label>

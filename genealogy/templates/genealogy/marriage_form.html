@@ -13,8 +13,53 @@
 <div class="card" style="max-width:640px;">
   <form method="post" enctype="multipart/form-data">{% csrf_token %}
 
-    {% include "genealogy/_person_picker_single.html" with field_name="person1" label="Persoon 1" selected_person=marriage.person1 %}
-    {% include "genealogy/_person_picker_single.html" with field_name="person2" label="Persoon 2" selected_person=marriage.person2 %}
+    <!-- Persoon 1 picker with Henry filter -->
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Persoon 1</label>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="person1-search" placeholder="Soek naam…" style="flex:1;" autocomplete="off">
+        <button type="button" class="btn btn-secondary" onclick="spOpenSpouse('person1','all')">Kies (Almal)</button>
+        <button type="button" class="btn btn-secondary" onclick="spOpenSpouse('person1','no_henry')">Kies (Sonder Henry)</button>
+      </div>
+      <div id="person1-selected" style="margin-bottom:8px;">
+        {% if marriage.person1 %}
+        <div class="pcard" style="min-width:140px;max-width:220px;cursor:default;position:relative;">
+          <div class="pcard-name">{{ marriage.person1.full_name }}</div>
+          <div class="pcard-dates" style="font-size:11px;">
+            {% if marriage.person1.birth_date %}geb. {{ marriage.person1.birth_year }}{% endif %}
+          </div>
+          {% if marriage.person1.birth_place %}<div style="font-size:11px;color:var(--muted);">{{ marriage.person1.birth_place }}</div>{% endif %}
+          <span class="badge badge-{% if marriage.person1.gender == 'M' %}male{% elif marriage.person1.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;">{{ marriage.person1.get_gender_display }}</span>
+          <button type="button" onclick="spClear('person1')" style="position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);">✕</button>
+        </div>
+        {% endif %}
+      </div>
+      <input type="hidden" name="person1" id="person1-value" value="{{ marriage.person1.pk|default:'' }}">
+    </div>
+
+    <!-- Persoon 2 picker with Henry filter -->
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Persoon 2</label>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="person2-search" placeholder="Soek naam…" style="flex:1;" autocomplete="off">
+        <button type="button" class="btn btn-secondary" onclick="spOpenSpouse('person2','all')">Kies (Almal)</button>
+        <button type="button" class="btn btn-secondary" onclick="spOpenSpouse('person2','no_henry')">Kies (Sonder Henry)</button>
+      </div>
+      <div id="person2-selected" style="margin-bottom:8px;">
+        {% if marriage.person2 %}
+        <div class="pcard" style="min-width:140px;max-width:220px;cursor:default;position:relative;">
+          <div class="pcard-name">{{ marriage.person2.full_name }}</div>
+          <div class="pcard-dates" style="font-size:11px;">
+            {% if marriage.person2.birth_date %}geb. {{ marriage.person2.birth_year }}{% endif %}
+          </div>
+          {% if marriage.person2.birth_place %}<div style="font-size:11px;color:var(--muted);">{{ marriage.person2.birth_place }}</div>{% endif %}
+          <span class="badge badge-{% if marriage.person2.gender == 'M' %}male{% elif marriage.person2.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;">{{ marriage.person2.get_gender_display }}</span>
+          <button type="button" onclick="spClear('person2')" style="position:absolute;top:4px;right:4px;background:none;border:none;cursor:pointer;font-size:13px;color:var(--muted);">✕</button>
+        </div>
+        {% endif %}
+      </div>
+      <input type="hidden" name="person2" id="person2-value" value="{{ marriage.person2.pk|default:'' }}">
+    </div>
 
     {% for field in form %}
       {% if field.name == 'person1' or field.name == 'person2' %}
@@ -22,7 +67,8 @@
       <div class="fg" style="margin-bottom:14px;position:relative;">
         <label>{{ field.label }}</label>
         <input type="text" id="{{ field.name }}_display" name="{{ field.name }}_display"
-               class="gedcom-date" placeholder="Klik om datum te kies…">
+               class="gedcom-date" placeholder="Klik om datum te kies…"
+               value="{% if field.name == 'marriage_date' %}{{ marriage_date_display }}{% else %}{{ end_date_display }}{% endif %}">
         <input type="hidden" name="{{ field.name }}" id="{{ field.name }}" value="{{ field.value|default:'' }}">
       </div>
       {% else %}

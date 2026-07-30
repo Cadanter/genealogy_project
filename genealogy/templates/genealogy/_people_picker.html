@@ -1,3 +1,4 @@
+{% load genealogy_extras %}
 <div class="fg" style="margin-bottom:14px;">
   <label>Mense</label>
 
@@ -29,6 +30,15 @@
     </div>
     <input type="text" id="pp-modal-search" placeholder="Soek naam of plek…"
            oninput="ppFilter(this.value)" autocomplete="off">
+    <div style="display:flex;gap:6px;align-items:center;">
+      <span style="font-size:12px;color:var(--muted);">Sorteer:</span>
+      <button type="button" class="btn btn-sm" id="pp-sort-first"
+              onclick="ppSetSort('first')"
+              style="padding:2px 8px;font-size:11px;">Voornaam</button>
+      <button type="button" class="btn btn-sm btn-primary" id="pp-sort-last"
+              onclick="ppSetSort('last')"
+              style="padding:2px 8px;font-size:11px;">Van</button>
+    </div>
     <div id="pp-results" style="overflow-y:auto;flex:1;display:flex;flex-wrap:wrap;gap:10px;
          padding:4px 0;">
     </div>
@@ -47,7 +57,9 @@
       death_year: "{{ p.death_year|default:'' }}",
       is_deceased: {{ p.is_deceased|yesno:"true,false" }},
       birth_place: "{{ p.birth_place|escapejs }}",
-      gender: "{{ p.gender }}"
+      gender: "{{ p.gender }}",
+      maiden_name: "{{ p.maiden_name|default:''|escapejs }}",
+      henry: "{% if henry_map %}{{ henry_map|get_item:p.pk }}{% endif %}"
     }{% if not forloop.last %},{% endif %}
     {% endfor %}
   ];
@@ -60,6 +72,16 @@
 ];
 
   let selected = new Set(PRE_SELECTED);
+  let ppSortMode = 'last';
+
+  window.ppSetSort = function (mode) {
+    ppSortMode = mode;
+    document.getElementById('pp-sort-first').className =
+      'btn btn-sm' + (mode === 'first' ? ' btn-primary' : '');
+    document.getElementById('pp-sort-last').className =
+      'btn btn-sm' + (mode === 'last' ? ' btn-primary' : '');
+    ppFilter(document.getElementById('pp-modal-search').value);
+  };
 
   function genderClass(g) {
     if (g === 'M') return 'male';
@@ -82,7 +104,8 @@
       card.className = 'pcard';
       card.style.cssText = 'min-width:140px;max-width:180px;cursor:default;position:relative;';
       card.innerHTML =
-        '<div class="pcard-name">' + p.name + '</div>' +
+        (p.henry ? '<div style="font-size:10px;font-family:monospace;color:var(--muted);margin-bottom:2px;">' + p.henry + '</div>' : '') +
+        '<div class="pcard-name">' + p.name + (p.maiden_name ? ' <span style="font-weight:400;color:var(--muted);">(nee ' + p.maiden_name + ')</span>' : '') + '</div>' +
         '<div class="pcard-dates" style="font-size:11px;">' +
           (p.birth_year ? 'geb. ' + p.birth_year : '') +
           (p.is_deceased && p.death_year ? ' – gest. ' + p.death_year : '') +
@@ -107,12 +130,24 @@
     });
   }
 
-  function ppFilter(q) {
+  window.ppFilter = function ppFilter(q) {
     const results = document.getElementById('pp-results');
     const lower   = q.toLowerCase();
     const matches = ALL_PEOPLE.filter(function (p) {
       return p.name.toLowerCase().includes(lower) ||
-             p.birth_place.toLowerCase().includes(lower);
+             p.birth_place.toLowerCase().includes(lower) ||
+             p.maiden_name.toLowerCase().includes(lower);
+    });
+
+    matches.sort(function (a, b) {
+      if (ppSortMode === 'first') {
+        return a.name.localeCompare(b.name);
+      } else {
+        var aLast = a.name.split(' ').slice(-1)[0];
+        var bLast = b.name.split(' ').slice(-1)[0];
+        if (aLast !== bLast) return aLast.localeCompare(bLast);
+        return a.name.localeCompare(b.name);
+      }
     });
 
     results.innerHTML = '';
@@ -122,7 +157,8 @@
       card.style.cssText = 'min-width:140px;max-width:180px;cursor:pointer;' +
         (selected.has(p.id) ? 'opacity:.45;' : '');
       card.innerHTML =
-        '<div class="pcard-name">' + p.name + '</div>' +
+        (p.henry ? '<div style="font-size:10px;font-family:monospace;color:var(--muted);margin-bottom:2px;">' + p.henry + '</div>' : '') +
+        '<div class="pcard-name">' + p.name + (p.maiden_name ? ' <span style="font-weight:400;color:var(--muted);">(nee ' + p.maiden_name + ')</span>' : '') + '</div>' +
         '<div class="pcard-dates" style="font-size:11px;">' +
           (p.birth_year ? 'geb. ' + p.birth_year : '') +
           (p.is_deceased && p.death_year ? ' – gest. ' + p.death_year : '') +
@@ -144,7 +180,7 @@
     if (matches.length === 0) {
       results.innerHTML = '<p style="color:var(--muted);font-size:13px;">Geen mense gevind nie.</p>';
     }
-  }
+  };
 
   window.ppOpenModal = function () {
     const modal = document.getElementById('pp-modal');
@@ -166,8 +202,8 @@
 
   // Sync the search bar above the picker (optional convenience)
   document.getElementById('pp-search').addEventListener('input', function () {
-    document.getElementById('pp-modal-search').value = this.value;
     ppOpenModal();
+    document.getElementById('pp-modal-search').value = this.value;
     ppFilter(this.value);
   });
 

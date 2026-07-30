@@ -1,4 +1,5 @@
 {% extends "genealogy/base.html" %}
+{% load genealogy_extras %}
 {% block title %}Mense — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}<a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Mense{% endblock %}
 {% block topbar_actions %}
@@ -13,7 +14,7 @@
 <div class="ph">
   <div>
     <h2>Mense</h2>
-    <p class="subtitle">{{ people.count }} rekord{{ people.count|pluralize:"s" }} in die argief</p>
+    <p class="subtitle">{{ people|length }} rekord{{ people|length|pluralize:"s" }} in die argief</p>
   </div>
 </div>
 
@@ -26,25 +27,100 @@
 </div>
 
 {% if people %}
-<!-- Sort controls -->
-{% load genealogy_extras %}
-<div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;">
+<!-- Controls row -->
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px;">
+
+  <!-- Sort -->
   <span style="font-size:13px;color:var(--muted);">Sorteer:</span>
-  <a href="?q={{ q }}&gender={{ gender }}&birth_from={{ birth_from }}&birth_to={{ birth_to }}&sort=name"
-     class="btn btn-sm {% if sort == 'name' %}btn-primary{% else %}btn-secondary{% endif %}">
-    A – Z
-  </a>
-  <a href="?q={{ q }}&gender={{ gender }}&birth_from={{ birth_from }}&birth_to={{ birth_to }}&sort=birth"
-     class="btn btn-sm {% if sort == 'birth' %}btn-primary{% else %}btn-secondary{% endif %}">
-    Geboortejaar
-  </a>
+  <a href="?query={{ q }}&gender={{ gender }}&birth_year_from={{ birth_from }}&birth_year_to={{ birth_to }}&sort=name&henry_only={{ henry_only }}&view={{ view_mode }}"
+     class="btn btn-sm {% if sort == 'name' %}btn-primary{% else %}btn-secondary{% endif %}">A – Z</a>
+  <a href="?query={{ q }}&gender={{ gender }}&birth_year_from={{ birth_from }}&birth_year_to={{ birth_to }}&sort=birth&henry_only={{ henry_only }}&view={{ view_mode }}"
+     class="btn btn-sm {% if sort == 'birth' %}btn-primary{% else %}btn-secondary{% endif %}">Geboortejaar</a>
   {% if henry_map %}
-  <a href="?q={{ q }}&gender={{ gender }}&birth_from={{ birth_from }}&birth_to={{ birth_to }}&sort=henry"
-     class="btn btn-sm {% if sort == 'henry' %}btn-primary{% else %}btn-secondary{% endif %}">
-    Henry Nommer
-  </a>
+  <a href="?query={{ q }}&gender={{ gender }}&birth_year_from={{ birth_from }}&birth_year_to={{ birth_to }}&sort=henry&henry_only={{ henry_only }}&view={{ view_mode }}"
+     class="btn btn-sm {% if sort == 'henry' %}btn-primary{% else %}btn-secondary{% endif %}">Henry Nommer</a>
   {% endif %}
+
+  <span style="width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
+
+  <!-- Henry filter -->
+  {% if henry_map %}
+  {% if henry_only %}
+  <a href="?query={{ q }}&gender={{ gender }}&birth_year_from={{ birth_from }}&birth_year_to={{ birth_to }}&sort={{ sort }}&view={{ view_mode }}"
+     class="btn btn-sm btn-primary">⊙ Alle mense</a>
+  {% else %}
+  <a href="?query={{ q }}&gender={{ gender }}&birth_year_from={{ birth_from }}&birth_year_to={{ birth_to }}&sort={{ sort }}&henry_only=1&view={{ view_mode }}"
+     class="btn btn-sm btn-secondary">⊙ Henry-lede slegs</a>
+  {% endif %}
+  {% endif %}
+
+  <span style="width:1px;height:20px;background:var(--border);margin:0 4px;"></span>
+
+  <!-- View toggle -->
+  <a href="?query={{ q }}&gender={{ gender }}&birth_year_from={{ birth_from }}&birth_year_to={{ birth_to }}&sort={{ sort }}&henry_only={{ henry_only }}&view=cards"
+     class="btn btn-sm {% if view_mode == 'cards' or not view_mode %}btn-primary{% else %}btn-secondary{% endif %}"
+     title="Kaarte">⊞</a>
+  <a href="?query={{ q }}&gender={{ gender }}&birth_year_from={{ birth_from }}&birth_year_to={{ birth_to }}&sort={{ sort }}&henry_only={{ henry_only }}&view=table"
+     class="btn btn-sm {% if view_mode == 'table' %}btn-primary{% else %}btn-secondary{% endif %}"
+     title="Tabel">☰</a>
 </div>
+
+{% if view_mode == 'table' %}
+<!-- Table view -->
+<div class="card"><div class="table-wrap"><table>
+  <thead>
+    <tr>
+      {% if henry_map %}<th>Henry</th>{% endif %}
+      <th>Naam</th>
+      <th>Nooiensvan</th>
+      <th>Geslag</th>
+      <th>Geboortedatum</th>
+      <th>Geboorteplek</th>
+      <th>Sterftedatum</th>
+      <th>Status</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in people %}
+    <tr>
+      {% if henry_map %}
+      <td style="font-family:monospace;font-size:11px;color:var(--muted);">
+        {% with hn=henry_map|get_item:p.pk %}{{ hn }}{% endwith %}
+      </td>
+      {% endif %}
+      <td>
+        <a href="{{ p.get_absolute_url }}">{{ p.full_name }}</a>
+      </td>
+      <td style="font-size:12px;color:var(--muted);">{{ p.maiden_name|default:"—" }}</td>
+      <td>
+        <span class="badge badge-{% if p.gender == 'M' %}male{% elif p.gender == 'F' %}female{% else %}viewer{% endif %}">
+          {{ p.get_gender_display }}
+        </span>
+      </td>
+      <td>{{ p.birth_date_display|default:"—" }}</td>
+      <td>{{ p.birth_place|default:"—" }}</td>
+      <td>{% if p.is_deceased %}{{ p.death_date_display|default:"—" }}{% else %}—{% endif %}</td>
+      <td>
+        {% if p.is_deceased %}
+          <span class="badge badge-viewer" style="background:var(--rust);color:#fff;">Oorlede</span>
+        {% else %}
+          <span class="badge badge-viewer" style="background:#2a5c3a;color:#dff0e6;">Lewend</span>
+        {% endif %}
+      </td>
+      <td style="white-space:nowrap;">
+        <a href="{{ p.get_absolute_url }}" class="btn btn-secondary btn-sm">Sien</a>
+        {% if profile and profile.can_edit %}
+          <a href="{% url 'genealogy:person_edit' p.pk %}" class="btn btn-secondary btn-sm">Wysig</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table></div></div>
+
+{% else %}
+<!-- Card view -->
 <div class="person-grid">
   {% for p in people %}
   <a href="{{ p.get_absolute_url }}" class="pcard">
@@ -54,6 +130,9 @@
       {% endwith %}
     {% endif %}
     <div class="pcard-name">{{ p.full_name }}</div>
+    {% if p.maiden_name and p.gender == 'F' %}
+    <div style="font-size:11px;color:var(--muted);font-style:italic;">(nee {{ p.maiden_name }})</div>
+    {% endif %}
     <div class="pcard-dates">
       {% if p.birth_date %}geb. {{ p.birth_year }}{% endif %}
       {% if p.is_deceased and p.death_date %} – gest. {{ p.death_year }}{% endif %}
@@ -65,6 +144,8 @@
   </a>
   {% endfor %}
 </div>
+{% endif %}
+
 {% else %}
 <div class="card" style="text-align:center;padding:48px;">
   <p style="font-size:28px;margin-bottom:10px;">⊙</p>

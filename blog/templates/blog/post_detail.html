@@ -91,6 +91,7 @@
       {% endfor %}
 
       <div class="comment-form">
+        {% if can_comment %}
         <h3>Laat 'n kommentaar / Leave a comment</h3>
         <form method="post">
           {% csrf_token %}
@@ -115,6 +116,18 @@
             <button type="submit" class="btn btn-primary">Stuur kommentaar / Submit comment</button>
           </div>
         </form>
+        {% elif user.is_authenticated %}
+        <p style="color:var(--muted);font-size:13px;padding:16px;background:var(--surface);border-radius:6px;border:1px solid var(--border);">
+          U rekening wag op goedkeuring voordat u kommentaar kan lewer. /
+          Your account is pending approval before you can comment.
+        </p>
+        {% else %}
+        <p style="color:var(--muted);font-size:13px;padding:16px;background:var(--surface);border-radius:6px;border:1px solid var(--border);">
+          Slegs goedgekeurde lede van die Van Eeden Familieargief kan kommentaar lewer. /
+          Only approved members of the Van Eeden Family Archive may leave comments.
+          <a href="/argief/teken-in/" style="color:var(--gold);margin-left:4px;">Teken in / Sign in</a>
+        </p>
+        {% endif %}
       </div>
     </div>
 

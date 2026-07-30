@@ -100,52 +100,96 @@ def dashboard(request):
 def person_list(request):
     profile = get_profile(request.user)
     sort = request.GET.get('sort', 'name')
-    q = request.GET.get('q', '')
-    gender = request.GET.get('gender', '')
-    birth_from = request.GET.get('birth_from', '')
-    birth_to = request.GET.get('birth_to', '')
+    # Match SearchForm field names exactly
+    q          = request.GET.get('query', '')
+    gender     = request.GET.get('gender', '')
+    birth_from = request.GET.get('birth_year_from', '')
+    birth_to   = request.GET.get('birth_year_to', '')
 
     people = Person.objects.all()
 
     if q:
         people = people.filter(
-            Q(first_name__icontains=q) |
-            Q(last_name__icontains=q)  |
+            Q(first_name__icontains=q)  |
+            Q(middle_name__icontains=q) |
+            Q(last_name__icontains=q)   |
+            Q(maiden_name__icontains=q) |
             Q(birth_place__icontains=q)
         )
     if gender:
         people = people.filter(gender=gender)
-    if birth_from:
-        people = people.filter(birth_date__gte=birth_from)
-    if birth_to:
-        people = people.filter(birth_date__lte=birth_to)
+
+    # Birth year filtering — done in Python since birth_date is a CharField
+    if birth_from or birth_to:
+        filtered = []
+        try:
+            from_year = int(birth_from) if birth_from else None
+            to_year   = int(birth_to)   if birth_to   else None
+        except ValueError:
+            from_year = to_year = None
+        for p in people:
+            try:
+                year = int(p.birth_year) if p.birth_year else None
+            except (ValueError, TypeError):
+                year = None
+            if year is None:
+                continue
+            if from_year and year < from_year:
+                continue
+            if to_year and year > to_year:
+                continue
+            filtered.append(p)
+        people = filtered
+
+    # Convert queryset to list if needed before sorting
+    if hasattr(people, 'order_by'):
+        if sort not in ('birth', 'henry'):
+            people = list(people.order_by('last_name', 'first_name'))
+        else:
+            people = list(people)
 
     if sort == 'birth':
-        # Sort in Python since birth_date is a CharField with GEDCOM strings
-        people = sorted(people, key=lambda p: p.birth_year or 9999)
-    else:
-        people = people.order_by('first_name', 'last_name')
+        people = sorted(people, key=lambda p: int(p.birth_year) if p.birth_year else 9999)
 
     # Compute Henry numbers
     from .henry import compute_henry_for_tree
+    import re as _re
     henry_map = {}
     root = Person.objects.filter(is_root=True).first()
     if root:
         henry_map = compute_henry_for_tree(root)
 
-    # Henry sort option
+    # Filter to only people with Henry numbers if requested
+    henry_only = request.GET.get('henry_only', '')
+    if henry_only:
+        people = [p for p in people if p.pk in henry_map]
+
+    def henry_sort_key(henry_str):
+        """Sort Henry numbers numerically: a1b2c11 > a1b2c2"""
+        if not henry_str:
+            return []
+        # Split into (letters, number) pairs: a1b2c11 -> [('a',1),('b',2),('c',11)]
+        parts = _re.findall(r'([a-z]+)(\d+)', henry_str)
+        return [(letters, int(num)) for letters, num in parts]
+
+    # Sort
     if sort == 'henry' and henry_map:
-        people = sorted(people, key=lambda p: henry_map.get(p.pk, 'zzzzz'))
+        people = sorted(people,
+            key=lambda p: henry_sort_key(henry_map.get(p.pk, '')))
     elif sort == 'birth':
         people = sorted(people, key=lambda p: p.birth_year or 9999)
     else:
-        people = people.order_by('first_name', 'last_name')
+        people = list(people.order_by('first_name', 'last_name')) if hasattr(people, 'order_by') else sorted(people, key=lambda p: (p.first_name, p.last_name))
+
+    # View mode: cards or table
+    view_mode = request.GET.get('view', 'cards')
 
     form = SearchForm(request.GET or None)
     return render(request, 'genealogy/person_list.html', {
         'people': people, 'profile': profile, 'sort': sort,
         'form': form, 'henry_map': henry_map,
         'q': q, 'gender': gender, 'birth_from': birth_from, 'birth_to': birth_to,
+        'henry_only': henry_only, 'view_mode': view_mode,
     })
 
 
@@ -154,7 +198,6 @@ def person_detail(request, pk):
     person   = get_object_or_404(Person, pk=pk)
     parents  = person.get_parents()
     children = person.get_children()
-    siblings = person.get_siblings()
     spouses  = person.get_spouses()
 
     # Timeline — sort by year extracted from GEDCOM string
@@ -163,61 +206,201 @@ def person_detail(request, pk):
         p = parse_gedcom_date(gedcom_str)
         return p.get('year', 0) if p else 0
 
+    def tl_sort_key(gedcom_str):
+        """Sort key using year, month, day for correct chronological order."""
+        p = parse_gedcom_date(gedcom_str) if gedcom_str else None
+        if not p:
+            return (0, 0, 0)
+        return (
+            int(p.get('year',  0) or 0),
+            int(p.get('month', 0) or 0),
+            int(p.get('day',   0) or 0),
+        )
+
     if person.birth_date:
         timeline.append({'date': person.birth_date_display,
-            'year': tl_year(person.birth_date),
+            'year': tl_year(person.birth_date), 'raw_date': person.birth_date,
             'label': 'Gebore', 'place': person.birth_place, 'type': 'birth'})
     for sp in spouses:
         m = sp['marriage']
         if m.marriage_date:
             timeline.append({'date': m.marriage_date_display,
-                'year': tl_year(m.marriage_date),
+                'year': tl_year(m.marriage_date), 'raw_date': m.marriage_date,
                 'label': f'Getroud met {sp["person"].full_name}',
                 'place': m.marriage_place, 'type': 'marriage'})
         if m.end_date:
             timeline.append({'date': m.end_date_display,
-                'year': tl_year(m.end_date),
+                'year': tl_year(m.end_date), 'raw_date': m.end_date,
                 'label': f'{m.get_status_display()} van {sp["person"].full_name}',
                 'place': m.end_place, 'type': 'marriage_end'})
     for event in person.events.all():
         if event.date:
             timeline.append({'date': event.date_display,
-                'year': tl_year(event.date),
+                'year': tl_year(event.date), 'raw_date': event.date,
                 'label': event.title, 'place': event.place, 'type': 'event'})
     if person.death_date:
         timeline.append({'date': person.death_date_display,
-            'year': tl_year(person.death_date),
+            'year': tl_year(person.death_date), 'raw_date': person.death_date,
             'label': 'Oorlede', 'place': person.death_place, 'type': 'death'})
-    timeline.sort(key=lambda x: x.get('year', 0))
+    timeline.sort(key=lambda x: tl_sort_key(x.get('raw_date', '')))
 
     audit_log = AuditLog.objects.filter(model_name='Person', object_id=pk).select_related('user')
 
-    # Separate blood children from non-blood children for display
-    blood_children = []
-    non_blood_children = []
-    NON_BLOOD = {'adoptive_parent': 'Aangeneem', 'step_parent': 'Stiefkind', 'guardian': 'Pleegkind'}
-    for rel in person.person_relationships.all():
-        if rel.relationship_type == 'parent':
-            blood_children.append({'person': rel.relative, 'label': None})
-        elif rel.relationship_type in NON_BLOOD:
-            non_blood_children.append({'person': rel.relative, 'label': NON_BLOOD[rel.relationship_type]})
+    # ── Sort key ────────────────────────────────────────────────────────────────
+    def _birth_key(item):
+        p = item['person'] if isinstance(item, dict) else item
+        try:
+            return int(p.birth_year) if p.birth_year else 9999
+        except (ValueError, TypeError):
+            return 9999
 
-    # Non-blood parents with label
-    non_blood_parents = []
+    # ── Henry helpers ────────────────────────────────────────────────────────────
+    from .henry import get_henry_number, compute_henry_for_tree
+    import re as _re
+    root = Person.objects.filter(is_root=True).first()
+    henry_map = compute_henry_for_tree(root) if root else {}
+
+    def _henry(p):
+        return henry_map.get(p.pk, '')
+
+    def _short_henry(p, pairs=1):
+        """Return last N letter-number pairs from Henry number.
+        pairs=1 -> 'j2', pairs=2 -> 'i2j2'
+        """
+        hn = _henry(p)
+        if not hn:
+            return ''
+        parts = _re.findall(r'[a-z]+\d+', hn)
+        if not parts:
+            return ''
+        return ''.join(parts[-pairs:]) if len(parts) >= pairs else ''.join(parts)
+
+    henry_number = henry_map.get(person.pk, '')
+
+    # ── Blood parents and non-blood parents ─────────────────────────────────────
+    NON_BLOOD = {'adoptive_parent': 'Aangeneem', 'step_parent': 'Stiefkind', 'guardian': 'Pleegkind'}
     blood_parents = []
+    non_blood_parents = []
+    seen_parent_pks = set()
     for rel in person.child_relationships.all():
         if rel.relationship_type == 'parent':
-            blood_parents.append(rel.person)
+            if rel.person.pk not in seen_parent_pks:
+                blood_parents.append({
+                    'person': rel.person,
+                    'short_henry': _short_henry(rel.person, 1)
+                })
+                seen_parent_pks.add(rel.person.pk)
         elif rel.relationship_type in NON_BLOOD:
-            non_blood_parents.append({'person': rel.person, 'label': NON_BLOOD[rel.relationship_type]})
+            if rel.person.pk not in seen_parent_pks:
+                non_blood_parents.append({
+                    'person': rel.person,
+                    'label': NON_BLOOD[rel.relationship_type],
+                    'short_henry': _short_henry(rel.person, 1)
+                })
+                seen_parent_pks.add(rel.person.pk)
 
-    from .henry import get_henry_number
-    henry_number = get_henry_number(person)
+    # ── Children ─────────────────────────────────────────────────────────────────
+    blood_children = []
+    non_blood_children = []
+    for rel in person.person_relationships.all():
+        if rel.relationship_type == 'parent':
+            blood_children.append({'person': rel.relative, 'label': None, 'short_henry': _short_henry(rel.relative, 2)})
+        elif rel.relationship_type in NON_BLOOD:
+            non_blood_children.append({'person': rel.relative, 'label': NON_BLOOD[rel.relationship_type], 'short_henry': _short_henry(rel.relative, 2)})
+
+    blood_children     = sorted(blood_children,     key=_birth_key)
+    non_blood_children = sorted(non_blood_children, key=_birth_key)
+
+    # ── Sibling classification ───────────────────────────────────────────────────
+    # Extract Person objects from blood_parents dicts for algorithm use
+    blood_parent_persons = [entry['person'] for entry in blood_parents]
+
+    # Blood parents PKs of current person
+    my_blood_parent_pks = set(p.pk for p in blood_parent_persons)
+
+    # Collect all potential siblings via blood parents and their spouses
+    blood_sibs      = {}  # pk -> person  (share BOTH biological parents)
+    half_sibs       = {}  # pk -> person  (share ONE biological parent)
+    step_sibs       = {}  # pk -> person  (no shared biological parent, connected via marriage)
+
+    # Step 1: children of my blood parents
+    for parent in blood_parent_persons:
+        for child in parent.get_children():
+            if child.pk == person.pk:
+                continue
+            child_parent_pks = set(
+                r.person.pk for r in child.child_relationships.filter(relationship_type='parent')
+            )
+            shared = my_blood_parent_pks & child_parent_pks
+            if len(shared) == len(my_blood_parent_pks) and len(shared) == len(child_parent_pks):
+                blood_sibs[child.pk] = child
+            elif shared:
+                half_sibs[child.pk] = child
+            else:
+                half_sibs[child.pk] = child  # connected through parent, at least one shared
+
+    # Step 2: step-siblings via parents' spouses
+    for parent in blood_parent_persons:
+        for sp_info in parent.get_spouses():
+            spouse = sp_info['person']
+            for child in spouse.get_children():
+                if child.pk == person.pk:
+                    continue
+                if child.pk in blood_sibs or child.pk in half_sibs:
+                    continue
+                child_parent_pks = set(
+                    r.person.pk for r in child.child_relationships.filter(relationship_type='parent')
+                )
+                if my_blood_parent_pks & child_parent_pks:
+                    half_sibs[child.pk] = child
+                else:
+                    step_sibs[child.pk] = child
+
+    # Gender-aware labels
+    def _sib_label(p, prefix):
+        if p.gender == 'M':
+            return f'{prefix}broer'
+        elif p.gender == 'F':
+            return f'{prefix}suster'
+        return f'{prefix}sib'
+
+    # Blood takes priority over half, half over step — deduplicate
+    seen_sib_pks = set()
+    classified_siblings = []
+
+    for p in blood_sibs.values():
+        if p.pk not in seen_sib_pks:
+            classified_siblings.append({
+                'person': p, 'short_henry': _short_henry(p, 2),
+                'label': _sib_label(p, ''),
+                'type': 'blood'
+            })
+            seen_sib_pks.add(p.pk)
+
+    for p in half_sibs.values():
+        if p.pk not in seen_sib_pks:
+            classified_siblings.append({
+                'person': p, 'short_henry': _short_henry(p, 2),
+                'label': _sib_label(p, 'Half'),
+                'type': 'half'
+            })
+            seen_sib_pks.add(p.pk)
+
+    for p in step_sibs.values():
+        if p.pk not in seen_sib_pks:
+            classified_siblings.append({
+                'person': p, 'short_henry': _short_henry(p),
+                'label': _sib_label(p, 'Stief'),
+                'type': 'step'
+            })
+            seen_sib_pks.add(p.pk)
+
+    classified_siblings = sorted(classified_siblings, key=_birth_key)
 
     return render(request, 'genealogy/person_detail.html', {
         'person': person, 'parents': blood_parents, 'children': blood_children,
         'non_blood_parents': non_blood_parents, 'non_blood_children': non_blood_children,
-        'siblings': siblings, 'spouses': spouses,
+        'siblings': classified_siblings, 'spouses': spouses,
         'timeline': timeline, 'audit_log': audit_log, 'profile': profile,
         'henry_number': henry_number,
     })
@@ -485,8 +668,20 @@ def audit_log(request):
 
 def marriage_list(request):
     profile   = get_profile(request.user)
-    marriages = Marriage.objects.select_related('person1','person2').all()
-    return render(request, 'genealogy/marriage_list.html', {'marriages': marriages, 'profile': profile})
+    marriages = list(Marriage.objects.select_related('person1','person2').all())
+    from .henry import compute_henry_for_tree
+    import re as _re
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+    def h_key(m):
+        hn = henry_map.get(m.person1.pk, '')
+        parts = _re.findall(r'([a-z]+)(\d+)', hn)
+        return [(l, int(n)) for l, n in parts] if parts else [('zzz', 9999)]
+    marriages = sorted(marriages, key=h_key)
+    return render(request, 'genealogy/marriage_list.html',
+        {'marriages': marriages, 'profile': profile, 'henry_map': henry_map})
 
 
 @login_required
@@ -505,9 +700,27 @@ def marriage_create(request):
             return redirect('genealogy:marriage_detail', pk=m.pk)
     else:
         form = MarriageForm()
+    # Pre-populate person1 if navigated from person_detail
+    preselect_person1 = None
+    person1_pk = request.GET.get('person1')
+    if person1_pk:
+        try:
+            preselect_person1 = Person.objects.get(pk=person1_pk)
+        except Person.DoesNotExist:
+            pass
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+    all_people = list(Person.objects.all().order_by('first_name', 'last_name'))
+    no_henry_people = [p for p in all_people if p.pk not in henry_map]
     return render(request, 'genealogy/marriage_form.html',
         {'form': form, 'title': 'Teken huwelik aan', 'profile': profile,
-        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
+        'all_people': all_people,
+        'no_henry_people': no_henry_people,
+        'henry_map': henry_map,
+        'marriage': type('obj', (object,), {'person1': preselect_person1, 'person2': None})()})
 
 
 @login_required
@@ -532,11 +745,23 @@ def marriage_edit(request, pk):
         form = MarriageForm(instance=marriage)
     # Fetch existing linked documents for display in the edit form
     existing_docs = Document.objects.filter(marriage=marriage)
+    from .gedcom_dates import gedcom_to_display
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+    all_people = Person.objects.all().order_by('first_name', 'last_name')
+    no_henry_people = [p for p in all_people if p.pk not in henry_map]
     return render(request, 'genealogy/marriage_form.html',
         {'form': form, 'title': 'Wysig huwelik', 'profile': profile,
         'marriage': marriage,
         'existing_docs': existing_docs,
-        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
+        'marriage_date_display': gedcom_to_display(marriage.marriage_date),
+        'end_date_display':      gedcom_to_display(marriage.end_date),
+        'all_people': all_people,
+        'no_henry_people': no_henry_people,
+        'henry_map': henry_map})
 
 
 def marriage_detail(request, pk):
@@ -570,8 +795,20 @@ def marriage_delete(request, pk):
 
 def relationship_list(request):
     profile = get_profile(request.user)
-    relationships = Relationship.objects.all()
-    return render(request, 'genealogy/relationship_list.html', {'relationships': relationships, 'profile': profile})
+    relationships = list(Relationship.objects.select_related('person','relative').all())
+    from .henry import compute_henry_for_tree
+    import re as _re
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+    def h_key(r):
+        hn = henry_map.get(r.person.pk, '')
+        parts = _re.findall(r'([a-z]+)(\d+)', hn)
+        return [(l, int(n)) for l, n in parts] if parts else [('zzz', 9999)]
+    relationships = sorted(relationships, key=h_key)
+    return render(request, 'genealogy/relationship_list.html',
+        {'relationships': relationships, 'profile': profile, 'henry_map': henry_map})
 
 def relationship_detail(request, pk):
     profile      = get_profile(request.user)
@@ -598,8 +835,27 @@ def relationship_create(request):
             return redirect('genealogy:relationship_detail', pk=rel.pk)
     else:
         form = RelationshipForm()
+    # Pre-populate person (parent) if navigated from person_detail
+    preselect_person = None
+    person_pk = request.GET.get('person')
+    if person_pk:
+        try:
+            preselect_person = Person.objects.get(pk=person_pk)
+        except Person.DoesNotExist:
+            pass
+    # People who are not yet linked as a child in any relationship
+    connected_child_pks = Relationship.objects.values_list('relative__pk', flat=True)
+    unconnected_people = Person.objects.exclude(pk__in=connected_child_pks).order_by('first_name', 'last_name')
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
     return render(request, 'genealogy/relationship_form.html', {'form': form, 'profile': profile,
-        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
+        'all_people': Person.objects.all().order_by('first_name', 'last_name'),
+        'unconnected_people': unconnected_people,
+        'henry_map': henry_map,
+        'relationship': type('obj', (object,), {'person': preselect_person, 'relative': None})()})
 
 @login_required
 def relationship_edit(request, pk):
@@ -621,10 +877,19 @@ def relationship_edit(request, pk):
     else:
         form = RelationshipForm(instance=relationship)
     existing_docs = Document.objects.filter(relationship=relationship)
+    connected_child_pks = Relationship.objects.exclude(pk=pk).values_list('relative__pk', flat=True)
+    unconnected_people = Person.objects.exclude(pk__in=connected_child_pks).order_by('first_name', 'last_name')
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
     return render(request, 'genealogy/relationship_form.html', {'form': form, 'profile': profile,
         'relationship': relationship,
         'existing_docs': existing_docs,
-        'all_people': Person.objects.all().order_by('first_name', 'last_name')})
+        'unconnected_people': unconnected_people,
+        'all_people': Person.objects.all().order_by('first_name', 'last_name'),
+        'henry_map': henry_map})
 
 def relationship_delete(request, pk):
     profile = get_profile(request.user)
@@ -674,8 +939,13 @@ def document_create(request):
             return redirect('genealogy:document_list')
     else:
         form = DocumentForm()
+        from .henry import compute_henry_for_tree
+        henry_map = {}
+        root = Person.objects.filter(is_root=True).first()
+        if root:
+            henry_map = compute_henry_for_tree(root)
     return render(request, 'genealogy/document_form.html',
-        {'form': form, 'title': 'Voeg dokument by', 'profile': profile, 'all_people': Person.objects.all().order_by('first_name', 'last_name')})
+        {'form': form, 'title': 'Voeg dokument by', 'profile': profile, 'all_people': Person.objects.all().order_by('first_name', 'last_name'), 'henry_map': henry_map})
 
 @login_required
 def document_edit(request, pk):
@@ -694,10 +964,15 @@ def document_edit(request, pk):
             return redirect('genealogy:document_detail', pk=pk)
     else:
         form = DocumentForm(instance=document)
+        from .henry import compute_henry_for_tree
+        henry_map = {}
+        root = Person.objects.filter(is_root=True).first()
+        if root:
+            henry_map = compute_henry_for_tree(root)
     return render(request, 'genealogy/document_form.html',
         {'form': form, 'title': 'Wysig dokument', 'profile': profile,
         'all_people': Person.objects.all().order_by('first_name', 'last_name'),
-        'document': document})
+        'document': document, 'henry_map': henry_map})
 
 @login_required
 def document_delete(request, pk):
@@ -733,11 +1008,13 @@ def event_create(request):
         form = EventForm(request.POST, request.FILES)
         if form.is_valid():
             event = form.save()
-            # Add main_person to people if provided
+            # Save main_person to FK and add to people
             main_pk = request.POST.get('main_person')
             if main_pk:
                 try:
                     main_p = Person.objects.get(pk=main_pk)
+                    event.main_person = main_p
+                    event.save()
                     event.people.add(main_p)
                 except Person.DoesNotExist:
                     pass
@@ -747,8 +1024,15 @@ def event_create(request):
             return redirect('genealogy:event_detail', pk=event.pk)
     else:
         form = EventForm()
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
     return render(request, 'genealogy/event_form.html',
-        {'form': form, 'title': 'Voeg gebeurtenis by', 'profile': profile, 'all_people': Person.objects.all().order_by('first_name', 'last_name')})
+        {'form': form, 'title': 'Voeg gebeurtenis by', 'profile': profile,
+        'all_people': Person.objects.all().order_by('last_name', 'first_name'),
+        'henry_map': henry_map})
 
 def event_detail(request, pk):
     profile = get_profile(request.user)
@@ -756,12 +1040,14 @@ def event_detail(request, pk):
     from .gedcom_dates import parse_gedcom_date
     from .gedcom_dates import parse_gedcom_date
     docs = list(Document.objects.filter(event=event))
+    main_person = event.main_person
     def doc_year(doc):
         p = parse_gedcom_date(doc.date)
         return int(p.get('year', 9999)) if p else 9999
     docs = sorted(docs, key=doc_year)
     return render(request, 'genealogy/event_detail.html',
-        {'event': event, 'documents': docs, 'profile': profile})
+        {'event': event, 'documents': docs, 'profile': profile,
+        'main_person': main_person})
 
 @login_required
 def event_edit(request, pk):
@@ -778,6 +1064,8 @@ def event_edit(request, pk):
             if main_pk:
                 try:
                     main_p = Person.objects.get(pk=main_pk)
+                    event.main_person = main_p
+                    event.save()
                     event.people.add(main_p)
                 except Person.DoesNotExist:
                     pass
@@ -787,12 +1075,19 @@ def event_edit(request, pk):
             return redirect('genealogy:event_detail', pk=pk)
     else:
         form = EventForm(instance=event)
-    main_person = event.people.first()
-    existing_docs = Document.objects.filter(event=event)
+        main_person = event.main_person
+        existing_docs = Document.objects.filter(event=event)
+        from .gedcom_dates import gedcom_to_display
+        from .henry import compute_henry_for_tree
+        henry_map = {}
+        root = Person.objects.filter(is_root=True).first()
+        if root:
+            henry_map = compute_henry_for_tree(root)
     return render(request, 'genealogy/event_form.html',
         {'form': form, 'title': 'Wysig gebeurtenis', 'profile': profile,
         'all_people': Person.objects.all().order_by('first_name', 'last_name'),
-        'event': event, 'main_person': main_person, 'existing_docs': existing_docs})
+        'event': event, 'main_person': main_person, 'existing_docs': existing_docs,
+        'event_date_display': gedcom_to_display(event.date), 'henry_map': henry_map})
 
 @login_required
 def event_delete(request, pk):
@@ -823,6 +1118,9 @@ def family_tree_data(request, pk):
         visited.add(p.pk)
         node = {
             'id': p.pk, 'name': p.full_name, 'gender': p.gender,
+            'first_name': p.first_name,
+            'middle_name': p.middle_name,
+            'last_name': p.last_name,
             'birth_year': p.birth_year, 'death_year': p.death_year,
             'url': p.get_absolute_url(), 'children': [],
         }
@@ -859,12 +1157,20 @@ def map_view(request):
 # ─── GEDCOM export ────────────────────────────────────────────────────────────
 
 def export_gedcom(request):
+    from .henry import compute_henry_for_tree
+    # Build Henry map
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+
     lines = ['0 HEAD', '1 GEDC', '2 VERS 5.5.1', '1 CHAR UTF-8',
         '1 SOUR VanEedenArgief', '2 NAME Van Eeden Familieargief']
     for p in Person.objects.all():
+        given = f'{p.first_name} {p.middle_name}'.strip() if p.middle_name else p.first_name
         lines += [f'0 @I{p.pk}@ INDI',
-            f'1 NAME {p.first_name} /{p.last_name}/',
-            f'2 GIVN {p.first_name}', f'2 SURN {p.last_name}']
+            f'1 NAME {given} /{p.last_name}/',
+            f'2 GIVN {given}', f'2 SURN {p.last_name}']
         if p.gender in ('M','F'):
             lines.append(f'1 SEX {p.gender}')
         if p.birth_date or p.birth_place:
@@ -877,14 +1183,56 @@ def export_gedcom(request):
             if p.death_place: lines.append(f'2 PLAC {p.death_place}')
         if p.biography:
             lines.append(f'1 NOTE {p.biography[:248]}')
+        # Add Henry number as custom tag
+        henry = henry_map.get(p.pk)
+        if henry:
+            lines.append(f'1 _HENRY {henry}')
+        # Mark root person
+        if p.is_root:
+            lines.append('1 _ROOT Y')
+    # Track which children have been assigned to a FAM record
+    children_in_fam = set()
+    fam_counter = 0
+
     for m in Marriage.objects.all():
-        lines += [f'0 @F{m.pk}@ FAM',
+        fam_counter += 1
+        lines += [f'0 @F{fam_counter}@ FAM',
             f'1 HUSB @I{m.person1.pk}@',
             f'1 WIFE @I{m.person2.pk}@']
         if m.marriage_date:
             lines += ['1 MARR', f'2 DATE {m.marriage_date}']
-        for child in m.person1.get_children():
+        if m.marriage_place:
+            lines.append(f'2 PLAC {m.marriage_place}')
+        if m.status and m.status != 'married':
+            lines.append(f'1 _STATUS {m.status}')
+        # Export all children of either parent (deduped)
+        all_children = {c.pk: c for c in m.person1.get_children()}
+        all_children.update({c.pk: c for c in m.person2.get_children()})
+        for child in all_children.values():
             lines.append(f'1 CHIL @I{child.pk}@')
+            children_in_fam.add(child.pk)
+
+    # Export parent-child relationships that have no marriage record
+    # Group children by their set of parents
+    from genealogy.models import Relationship as Rel
+    from collections import defaultdict
+    parent_groups = defaultdict(list)
+    for rel in Rel.objects.filter(relationship_type='parent').select_related('person', 'relative'):
+        if rel.relative.pk not in children_in_fam:
+            parent_groups[rel.person.pk].append(rel.relative)
+
+    for parent_pk, children in parent_groups.items():
+        fam_counter += 1
+        parent = Person.objects.get(pk=parent_pk)
+        # Determine HUSB or WIFE based on gender
+        if parent.gender == 'F':
+            lines += [f'0 @F{fam_counter}@ FAM', f'1 WIFE @I{parent_pk}@']
+        else:
+            lines += [f'0 @F{fam_counter}@ FAM', f'1 HUSB @I{parent_pk}@']
+        for child in children:
+            lines.append(f'1 CHIL @I{child.pk}@')
+            children_in_fam.add(child.pk)
+
     lines.append('0 TRLR')
     response = HttpResponse('\r\n'.join(lines), content_type='text/plain; charset=utf-8')
     response['Content-Disposition'] = 'attachment; filename="van_eeden_familie.ged"'
@@ -929,6 +1277,7 @@ def import_gedcom(request):
                         death_date=dd, death_place=i.get('death_place',''),
                         is_deceased=i.get('is_deceased', False),
                         notes=i.get('notes','').strip(),
+                        is_root=i.get('is_root', False),
                         created_by=request.user,
                     )
                     xref_to_pk[xref] = person.pk

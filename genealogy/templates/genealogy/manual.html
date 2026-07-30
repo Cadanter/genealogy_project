@@ -1,0 +1,614 @@
+{% extends "genealogy/base.html" %}
+{% load static %}
+{% block title %}Gebruikershandleiding — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span> Gebruikershandleiding
+{% endblock %}
+{% block topbar_actions %}
+  <button onclick="window.print()" class="btn btn-secondary btn-sm">⬇ Laai PDF af</button>
+{% endblock %}
+{% block extra_css %}
+<style>
+  .manual {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 0 0 60px 0;
+  }
+  .manual-lang {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 32px;
+  }
+  .manual-lang button {
+    padding: 6px 18px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .manual-lang button.active {
+    background: var(--gold);
+    color: #1c1710;
+    border-color: var(--gold);
+  }
+  .lang-af, .lang-en {
+    display: none;
+  }
+  .lang-af.active, .lang-en.active {
+    display: block;
+  }
+  .manual h1 {
+    font-size: 28px;
+    margin-bottom: 6px;
+  }
+  .manual h2 {
+    font-size: 20px;
+    margin: 36px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+  }
+  .manual h3 {
+    font-size: 15px;
+    margin: 24px 0 8px;
+    color: var(--gold);
+  }
+  .manual p {
+    line-height: 1.7;
+    margin-bottom: 12px;
+    font-size: 14px;
+  }
+  .manual ol, .manual ul {
+    padding-left: 22px;
+    margin-bottom: 12px;
+  }
+  .manual li { 
+    line-height: 1.7; 
+    font-size: 14px; 
+    margin-bottom: 4px; 
+  }
+  .manual .note { 
+    background: var(--surface); 
+    border-left: 3px solid var(--gold);
+    padding: 10px 14px; 
+    border-radius: 0 4px 4px 0; 
+    margin: 16px 0; font-size: 13px; 
+  }
+  .manual .screenshot { 
+    background: var(--surface); 
+    border: none;
+    border-radius: 6px; 
+    padding: 0px 0px; 
+    display: flex;
+    align-items: center; 
+    justify-content: center; 
+    overflow: hidden;
+    height: auto;
+  }
+  .manual.screenshot img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .manual .role-table { 
+    width: 100%; 
+    border-collapse: collapse; 
+    margin: 16px 0; 
+    font-size: 13px; 
+  }
+  .manual .role-table th { 
+    text-align: left; 
+    padding: 8px 12px; 
+    background: var(--surface);
+    border-bottom: 2px solid var(--border); 
+  }
+  .manual .role-table td { 
+    padding: 8px 12px; 
+    border-bottom: 1px solid var(--border); 
+  }
+  .manual .toc { 
+    background: var(--surface); 
+    border-radius: 6px;  
+    padding: 20px; 
+    margin-bottom: 32px;
+  }
+  .manual .toc h4 { 
+    margin: 0 0 10px; 
+    font-size: 13px; 
+    text-transform: uppercase;
+    letter-spacing: .08em; 
+    color: var(--muted); 
+  }
+  .manual .toc ol { 
+    margin: 0; 
+    padding-left: 18px; 
+  }
+  .manual .toc li { 
+    margin-bottom: 4px; 
+  }
+  .manual .toc a { 
+    color: var(--gold); 
+    text-decoration: none; 
+    font-size: 13px; 
+  }
+  .manual .toc a:hover { 
+    text-decoration: underline; 
+  }
+  @media print {
+    .topbar, .breadcrumb-bar, .ph { display: none !important; }
+    .manual {
+      max-width: 100%;
+      padding: 0;
+    }
+    .manual-lang { 
+      display: none; 
+    }
+    .lang-af, .lang-en { 
+      display: block !important; 
+    }
+    .lang-en { 
+      page-break-before: always; 
+    }
+    body { 
+      background: white !important; 
+      color: black !important; 
+    }
+    .card { 
+      box-shadow: none !important; 
+      border: 1px solid #ccc !important; 
+    }
+    .manual .screenshot { 
+      border: 1px solid #ccc; 
+    }
+  }
+</style>
+{% endblock %}
+{% block content %}
+<div class="manual">
+  <div class="ph"><div>
+    <h1>Gebruikershandleiding / User Manual</h1>
+    <p class="subtitle">Van Eeden Familiegeskiedenis Argief</p>
+  </div></div>
+
+  <!-- Language toggle -->
+  <div class="manual-lang">
+    <button class="active" onclick="setLang('af')">Afrikaans</button>
+    <button onclick="setLang('en')">English</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- AFRIKAANS -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="lang-af active">
+
+    <div class="toc">
+      <h4>Inhoudsopgawe</h4>
+      <ol>
+        <li><a href="#af-oorsig">Oorsig van die Argief</a></li>
+        <li><a href="#af-rolle">Gebruikersrolle</a></li>
+        <li><a href="#af-registreer">Registreer en Teken In</a></li>
+        <li><a href="#af-blaai">Blaai deur die Argief</a></li>
+        <li><a href="#af-mense">Mense</a></li>
+        <li><a href="#af-huwelike">Huwelike</a></li>
+        <li><a href="#af-verhoudings">Verhoudings</a></li>
+        <li><a href="#af-gebeure">Gebeure</a></li>
+        <li><a href="#af-dokumente">Dokumente</a></li>
+        <li><a href="#af-henry">Henry-nommeringstelsel</a></li>
+        <li><a href="#af-stamboom">Stamboom en Kaart</a></li>
+        <li><a href="#af-blog">Blog</a></li>
+        <li><a href="#af-gedcom">GEDCOM In- en Uitvoer</a></li>
+      </ol>
+    </div>
+
+    <h2 id="af-oorsig">1. Oorsig van die Argief</h2>
+    <p>Die Van Eeden Familiegeskiedenis Argief is 'n aanlyn genealogie-platform wat ontwikkel is om die Van Eeden familiegeskiedenis vry beskikbaar te stel aan alle familielede. Die argief bevat inligting oor mense, huwelike, verhoudings, gebeure en dokumente wat verband hou met die familie.</p>
+    <p>Die stelsel gebruik die <strong>Henry-nommeringstelsel</strong> om elke persoon se posisie in die stamboom te identifiseer, presies soos in die familiegeskiedenisboek waarop hierdie argief gebaseer is.</p>
+    <div class="screenshot"><img src="{% static 'core/img/tuisblad.jpg' %}" alt="Tuisblad"></div>
+
+    <h2 id="af-rolle">2. Gebruikersrolle</h2>
+    <p>Die argief het vier gebruikersrolle met verskillende toegangsvlakke:</p>
+    <table class="role-table">
+      <tr><th>Rol</th><th>Beskrywing</th><th>Toegang</th></tr>
+      <tr><td><strong>Gasheer</strong></td><td>Nie aangemeld nie</td><td>Kan slegs die openbare bladsye sien</td></tr>
+      <tr><td><strong>Kyker</strong></td><td>Goedgekeurde lid</td><td>Kan alle rekords sien maar nie wysig nie</td></tr>
+      <tr><td><strong>Vertroude Lid</strong></td><td>Vertroude familielid</td><td>Kan rekords sien, byvoeg en wysig</td></tr>
+      <tr><td><strong>Administrateur</strong></td><td>Beheerder</td><td>Volle toegang insluitend lede bestuur</td></tr>
+    </table>
+    <div class="note">📌 Nuwe gebruikers begin as <strong>Hangende Beoordeling</strong> totdat die administrateur hul rekening goedkeur.</div>
+
+    <h2 id="af-registreer">3. Registreer en Teken In</h2>
+    <h3>Registreer</h3>
+    <ol>
+      <li>Klik op <strong>Versoek Toegang</strong> op die tuisblad.</li>
+      <li>Vul u volle naam, gebruikersnaam, e-posadres en wagwoord in.</li>
+      <li>Verduidelik u verbinding met die Van Eeden familie in die <em>Verbinding</em>-veld.</li>
+      <li>Klik <strong>Registreer</strong>. U rekening sal deur die administrateur hersien word.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/registrasie.jpg' %}" alt="Registrasie"></div>
+    <h3>Teken In</h3>
+    <ol>
+      <li>Klik op <strong>Teken In</strong> bo-regs op die bladsy.</li>
+      <li>Voer u gebruikersnaam en wagwoord in.</li>
+      <li>Klik <strong>Teken In</strong>.</li>
+    </ol>
+    <div class="note">📌 As u wagwoord vergeet is, kontak die administrateur by <a href="mailto:danie@cadanter.co.za">danie@cadanter.co.za</a>.</div>
+
+    <h2 id="af-blaai">4. Blaai deur die Argief</h2>
+    <p>Sodra u aangemeld is, het u toegang tot die hoofkieslys:</p>
+    <ul>
+      <li><strong>Mense</strong> — Alle persone in die argief</li>
+      <li><strong>Huwelike</strong> — Huweliksrekords</li>
+      <li><strong>Verhoudings</strong> — Ouer-kind verbindings</li>
+      <li><strong>Gebeure</strong> — Geboortes, sterftes, dope en ander gebeure</li>
+      <li><strong>Dokumente</strong> — Gesertifiseerde dokumente en foto's</li>
+      <li><strong>Blog</strong> — Familienuus en artikels</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/hoofkieslys.jpg' %}" alt="Hoofkieslys"></div>
+
+    <h2 id="af-mense">5. Mense</h2>
+    <h3>Soek 'n persoon</h3>
+    <ol>
+      <li>Klik op <strong>Mense</strong> in die kieslys.</li>
+      <li>Gebruik die soekbalk om te soek op naam of geboorteplek.</li>
+      <li>Sorteer die lys op <strong>A–Z</strong>, <strong>Geboortejaar</strong> of <strong>Henry Nommer</strong>.</li>
+      <li>Wissel tussen <strong>kaartaansig</strong> (⊞) en <strong>tabelaansig</strong> (☰).</li>
+      <li>Gebruik die <strong>Henry-lede slegs</strong> knoppie om slegs persone met Henry-nommers te sien.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/soekbalk.jpg' %}" alt="Persoonslys"></div>
+    <h3>Sien 'n persoon se besonderhede</h3>
+    <p>Klik op enige persoon se naam of kaart om hul volledige profiel te sien. Die profielbladsy toon:</p>
+    <ul>
+      <li>Persoonlike besonderhede (naam, geslag, geboortedatum en -plek, sterftedatum en -plek)</li>
+      <li>Henry-nommer</li>
+      <li>Ouderdom</li>
+      <li>Foto (indien beskikbaar)</li>
+      <li>Familie-verbindings (ouers, eggenoot/eggenote, kinders, broers en susters)</li>
+      <li>Lewenslyn</li>
+      <li>Verwante dokumente</li>
+      <li>Biografie en aantekeninge</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/persoonprofiel.jpg' %}" alt="Persoon se profielbladsy"></div>
+    <div class="note">📌 Broers en susters word gelabel as <strong>Broer/Suster</strong> (bloedverwant), <strong>Halfbroer/Halfsuster</strong> (deel een biologiese ouer) of <strong>Stiefbroer/Stiefsuster</strong> (geen gedeelde biologiese ouer). Die laaste twee syfers van hul Henry-nommer verskyn ook langs hul naam.</div>
+
+    <h3>Voeg 'n persoon by (Vertroude Lede)</h3>
+    <ol>
+      <li>Klik op <strong>+ Voeg persoon by</strong> bo-regs op die Mense-bladsy.</li>
+      <li>Vul die verpligte velde in: voornaam, van en geslag.</li>
+      <li>Voeg datums in deur op die datumveld te klik — die datumkieser sal oopmaak.</li>
+      <li>Laai 'n foto op indien beskikbaar.</li>
+      <li>Klik <strong>💾 Stoor</strong>.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/persoonvorm.jpg' %}" alt="Persoonsvorm met datumkieser"></div>
+    <div class="note">📌 Datums word in GEDCOM-formaat gestoor wat benaderde datums ondersteun, bv. <em>Ongeveer 1900</em>, <em>Voor 1750</em> of <em>Na 1820</em>.</div>
+    <div class="note">📌 Omdat ek gebruik maak van Opensource Maps, is dit belangrik om Engelse plekname in te vul in die <em>Geboorteplek</em> en <em>Sterfteplek</em> blokke.</div>
+
+    <h2 id="af-huwelike">6. Huwelike</h2>
+    <h3>Sien huweliksrekords</h3>
+    <p>Klik op <strong>Huwelike</strong> in die kieslys. Die lys is gesorteer volgens die Henry-nommer van Persoon 1. Klik op <strong>Sien</strong> om 'n huwelik se volledige besonderhede te sien, insluitend gekoppelde dokumente soos huweliksertifikate.</p>
+    <div class="screenshot"><img src="{% static 'core/img/huweliklys.jpg' %}" alt="Huwelikslys"></div>
+    <h3>Voeg 'n huwelik by (Vertroude Lede)</h3>
+    <ol>
+      <li>Klik op <strong>+ Teken huwelik aan</strong>.</li>
+      <li>Soek en kies <strong>Persoon 1</strong> en <strong>Persoon 2</strong> met die soekvenster. Gebruik <strong>Kies (Sonder Henry)</strong> om slegs persone te wys wat nog nie in die stamboom is nie.</li>
+      <li>Voer die huweliksdatum en -plek in.</li>
+      <li>Kies die huwelikstatus (Getroud, Geskei, ens.).</li>
+      <li>Laai 'n huweliksertifikaat of skeibrief op indien beskikbaar.</li>
+      <li>Klik <strong>💾 Stoor</strong>.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/huwelikvorm.jpg' %}" alt="Huweliksvorm met persoonsoekvenster"></div>
+
+    <h2 id="af-verhoudings">7. Verhoudings</h2>
+    <p>Verhoudings koppel ouers aan kinders. Sonder verhoudings sal die Henry-nommers nie bereken word nie.</p>
+    <h3>Voeg 'n verhouding by (Vertroude Lede)</h3>
+    <ol>
+      <li>Klik op <strong>+ Voeg verhouding by</strong>.</li>
+      <li>Kies die <strong>Ouer</strong> met die soekvenster.</li>
+      <li>Kies die <strong>Kind</strong> — gebruik <strong>Kies (Onverbind)</strong> om slegs persone te wys wat nog nie gekoppel is nie.</li>
+      <li>Kies die verhoudingstipe: <em>Ouer</em>, <em>Aangenome Ouer</em>, <em>Stief Ouer</em> of <em>Voog</em>.</li>
+      <li>Vir aannemings en voogdyskappe kan u die relevante dokument laai.</li>
+      <li>Klik <strong>💾 Stoor</strong>.</li>
+    </ol>
+    <div class="note">📌 Die soekvenster toon die Henry-nommer van elke persoon sodat u makliker die regte persoon kan identifiseer.</div>
+    <div class="screenshot"><img src="{% static 'core/img/verhoudingvorm.jpg' %}" alt="Verhoudingsvorm"></div>
+
+    <h2 id="af-gebeure">8. Gebeure</h2>
+    <p>Gebeure sluit in geboortes, sterftes, dope, immigrasie, militêre diens en graduering.</p>
+    <h3>Voeg 'n gebeurtenis by (Vertroude Lede)</h3>
+    <ol>
+      <li>Klik op <strong>+ Voeg gebeurtenis by</strong>.</li>
+      <li>Voer die titel en kies die tipe gebeurtenis.</li>
+      <li>Voer die datum en plek in.</li>
+      <li>Kies die <strong>Hoofpersoon</strong> — die dokument word aan hierdie persoon gekoppel.</li>
+      <li>Voeg ander betrokke mense by onder <strong>Mense</strong>.</li>
+      <li>Laai die relevante dokument op (bv. geboortesertifikaat).</li>
+      <li>Klik <strong>💾 Stoor</strong>.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/gebeurtenisvorm.jpg' %}" alt="Gebeurtenisvorm"></div>
+
+    <h2 id="af-dokumente">9. Dokumente</h2>
+    <p>Dokumente kan direk gelaai word of word outomaties gekoppel wanneer u 'n huwelik, verhouding of gebeurtenis stoor.</p>
+    <h3>Dokumenttipes</h3>
+    <ul>
+      <li><strong>Handmatig laaibaar:</strong> Sensus Rekord, Foto, Brief, Testament, Ander</li>
+      <li><strong>Outomaties gekoppel:</strong> Geboorte- en doopsertifikate, Huweliksertifikate, Skeibriefe, Aannemingspapiere, ens.</li>
+    </ul>
+    <h3>Soek dokumente</h3>
+    <p>Gebruik die <strong>🔍 Soek</strong> knoppie op die Dokumentelys om te soek op titel, tipe, persoon of datum.</p>
+    <div class="screenshot"><img src="{% static 'core/img/dokumentsoek.jpg' %}" alt="Dokumentsoekbladsy"></div>
+
+    <h2 id="af-henry">10. Henry-nommeringstelsel</h2>
+    <p>Die argief gebruik die Henry-stelsel om elke persoon se posisie in die stamboom aan te dui:</p>
+    <ul>
+      <li><strong>a1</strong> — Die stam-ouer (Jan Janse van Eeden)</li>
+      <li><strong>a1b1, a1b2, a1b3...</strong> — Sy kinders in geboortevolgorde</li>
+      <li><strong>a1b1c1, a1b1c2...</strong> — Kleinkinders</li>
+    </ul>
+    <p>Henry-nommers verskyn op persoonskaarttjies, in die soekvenssters en langs name in die familie-afdeling van elke profiel. Die laaste twee syfers (bv. <em>j2</em>) verskyn langs broers, susters en kinders vir maklike identifikasie.</p>
+    <div class="note">📌 Henry-nommers word outomaties bereken op grond van die verhoudings in die argief. As 'n persoon geen Henry-nommer het nie, beteken dit dat hul ouer-verbinding nog nie ingevoer is nie.</div>
+    <div class="screenshot"><img src="{% static 'core/img/henrynommers.jpg' %}" alt="Persoonslys met Henry-nommers"></div>
+
+    <h2 id="af-stamboom">11. Stamboom en Kaart</h2>
+    <h3>Stamboom</h3>
+    <p>Klik op <strong>Stamboom</strong> op enige persoon se profielbladsy om hul afstammelinge as 'n visuele boom te sien. U kan:</p>
+    <ul>
+      <li>Opsoom met die muiswiel</li>
+      <li>Sleep om te beweeg</li>
+      <li>Op 'n naam klik om dié persoon se profiel te open</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/stamboom.jpg' %}" alt="Stamboombeskouing"></div>
+    <h3>Kaart</h3>
+    <p>Die kaartbeskouing toon die geografiese verspreiding van geboorteplekke. Klik op 'n punt om meer inligting te sien.</p>
+    <div class="screenshot"><img src="{% static 'core/img/kaart.jpg' %}" alt="Kaartbeskouing"></div>
+
+    <h2 id="af-blog">12. Blog</h2>
+    <p>Die blog bevat familienuus en artikels in Afrikaans en/of Engels.</p>
+    <ul>
+      <li>Alle besoekers kan die blog lees.</li>
+      <li>Slegs goedgekeurde lede kan kommentaar lewer.</li>
+      <li>Slegs Vertroude Lede en Administrateurs kan plasings skep.</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/blog.jpg' %}" alt="Blogbladsy"></div>
+
+    <h2 id="af-gedcom">13. GEDCOM In- en Uitvoer</h2>
+    <p>GEDCOM is die standaardformaat vir die uitruil van genealogiese data tussen stelsels.</p>
+    <h3>Uitvoer</h3>
+    <ol>
+      <li>Klik op <strong>Uitvoer GEDCOM</strong> op die dashboard.</li>
+      <li>'n Lêer genaamd <em>van_eeden_familie.ged</em> sal afgelaai word.</li>
+      <li>Hierdie lêer bevat alle mense, huwelike, verhoudings en Henry-nommers.</li>
+    </ol>
+    <h3>Invoer</h3>
+    <ol>
+      <li>Klik op <strong>Invoer GEDCOM</strong> op die dashboard.</li>
+      <li>Kies u .ged-lêer.</li>
+      <li>Klik <strong>Invoer</strong>. Die stelsel sal alle rekords invoer en Henry-nommers bereken.</li>
+    </ol>
+    <div class="note">📌 Die invoer funksie word aanbeveel slegs vir die aanvanklike opstelling van die argief. Daarna gebruik die webkoppelvlak direk.</div>
+
+  </div>
+  <!-- end lang-af -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <!-- ENGLISH -->
+  <!-- ══════════════════════════════════════════════════════════════════════ -->
+  <div class="lang-en">
+
+    <div class="toc">
+      <h4>Table of Contents</h4>
+      <ol>
+        <li><a href="#en-overview">Overview of the Archive</a></li>
+        <li><a href="#en-roles">User Roles</a></li>
+        <li><a href="#en-register">Register and Sign In</a></li>
+        <li><a href="#en-browse">Browse the Archive</a></li>
+        <li><a href="#en-people">People</a></li>
+        <li><a href="#en-marriages">Marriages</a></li>
+        <li><a href="#en-relationships">Relationships</a></li>
+        <li><a href="#en-events">Events</a></li>
+        <li><a href="#en-documents">Documents</a></li>
+        <li><a href="#en-henry">Henry Numbering System</a></li>
+        <li><a href="#en-tree">Family Tree and Map</a></li>
+        <li><a href="#en-blog">Blog</a></li>
+        <li><a href="#en-gedcom">GEDCOM Import and Export</a></li>
+      </ol>
+    </div>
+
+    <h2 id="en-overview">1. Overview of the Archive</h2>
+    <p>The Van Eeden Family History Archive is an online genealogy platform developed to make the Van Eeden family history freely available to all family members. The archive contains information about people, marriages, relationships, events and documents related to the family.</p>
+    <p>The system uses the <strong>Henry Numbering System</strong> to identify each person's position in the family tree, exactly as in the family history book on which this archive is based.</p>
+    <div class="screenshot"><img src="{% static 'core/img/tuisblad.jpg' %}" alt="Home page / Dashboard"></div>
+
+    <h2 id="en-roles">2. User Roles</h2>
+    <p>The archive has four user roles with different levels of access:</p>
+    <table class="role-table">
+      <tr><th>Role</th><th>Description</th><th>Access</th></tr>
+      <tr><td><strong>Guest</strong></td><td>Not signed in</td><td>Can only view public pages</td></tr>
+      <tr><td><strong>Viewer</strong></td><td>Approved member</td><td>Can view all records but not edit</td></tr>
+      <tr><td><strong>Trusted Member</strong></td><td>Trusted family member</td><td>Can view, add and edit records</td></tr>
+      <tr><td><strong>Administrator</strong></td><td>Administrator</td><td>Full access including member management</td></tr>
+    </table>
+    <div class="note">📌 New users start as <strong>Pending Review</strong> until the administrator approves their account.</div>
+
+    <h2 id="en-register">3. Register and Sign In</h2>
+    <h3>Register</h3>
+    <ol>
+      <li>Click <strong>Request Access</strong> on the home page.</li>
+      <li>Fill in your full name, username, email address and password.</li>
+      <li>Explain your connection to the Van Eeden family in the <em>Connection</em> field.</li>
+      <li>Click <strong>Register</strong>. Your account will be reviewed by the administrator.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/registrasie.jpg' %}" alt="Registration form"></div>
+    <h3>Sign In</h3>
+    <ol>
+      <li>Click <strong>Sign In</strong> at the top right of the page.</li>
+      <li>Enter your username and password.</li>
+      <li>Click <strong>Sign In</strong>.</li>
+    </ol>
+    <div class="note">📌 If you have forgotten your password, contact the administrator at <a href="mailto:danie@cadanter.co.za">danie@cadanter.co.za</a>.</div>
+
+    <h2 id="en-browse">4. Browse the Archive</h2>
+    <p>Once signed in, you have access to the main menu:</p>
+    <ul>
+      <li><strong>People</strong> — All persons in the archive</li>
+      <li><strong>Marriages</strong> — Marriage records</li>
+      <li><strong>Relationships</strong> — Parent-child connections</li>
+      <li><strong>Events</strong> — Births, deaths, baptisms and other events</li>
+      <li><strong>Documents</strong> — Certified documents and photographs</li>
+      <li><strong>Blog</strong> — Family news and articles</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/hoofkieslys.jpg' %}" alt="Main menu"></div>
+
+    <h2 id="en-people">5. People</h2>
+    <h3>Search for a person</h3>
+    <ol>
+      <li>Click <strong>People</strong> in the menu.</li>
+      <li>Use the search bar to search by name or place of birth.</li>
+      <li>Sort the list by <strong>A–Z</strong>, <strong>Birth Year</strong> or <strong>Henry Number</strong>.</li>
+      <li>Switch between <strong>card view</strong> (⊞) and <strong>table view</strong> (☰).</li>
+      <li>Use the <strong>Henry members only</strong> button to show only persons with Henry numbers.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/persoonprofiel.jpg' %}" alt="People list with search bar and sort options"></div>
+    <h3>View a person's details</h3>
+    <p>Click on any person's name or card to view their full profile. The profile page shows:</p>
+    <ul>
+      <li>Personal details (name, gender, birth date and place, death date and place)</li>
+      <li>Henry number</li>
+      <li>Age</li>
+      <li>Photo (if available)</li>
+      <li>Family connections (parents, spouse/spouses, children, brothers and sisters)</li>
+      <li>Timeline</li>
+      <li>Related documents</li>
+      <li>Biography and notes</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/persoonprofiel.jpg' %}" alt="Person profile page"></div>
+    <div class="note">📌 Brothers and sisters are labelled as <strong>Brother/Sister</strong> (blood relative), <strong>Half-brother/Half-sister</strong> (share one biological parent) or <strong>Step-brother/Step-sister</strong> (no shared biological parent). The last two digits of their Henry number also appear next to their name.</div>
+
+    <h3>Add a person (Trusted Members)</h3>
+    <ol>
+      <li>Click <strong>+ Add person</strong> at the top right of the People page.</li>
+      <li>Fill in the required fields: first name, surname and gender.</li>
+      <li>Add dates by clicking on the date field — the date picker will open.</li>
+      <li>Upload a photo if available.</li>
+      <li>Click <strong>💾 Save</strong>.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/persoonvorm.jpg' %}" alt="Person form with date picker"></div>
+    <div class="note">📌 Dates are stored in GEDCOM format which supports approximate dates, e.g. <em>About 1900</em>, <em>Before 1750</em> or <em>After 1820</em>.</div>
+    <div class="note">📌 Because I use OpenStreetMap, it is important to enter English place names in the <em>Birth place</em> and <em>Death place</em> fields.</div>
+
+    <h2 id="en-marriages">6. Marriages</h2>
+    <h3>View marriage records</h3>
+    <p>Click on <strong>Marriages</strong> in the menu. The list is sorted by the Henry number of Person 1. Click <strong>View</strong> to see a marriage's full details, including linked documents such as marriage certificates.</p>
+    <div class="screenshot"><img src="{% static 'core/img/huweliklys.jpg' %}" alt="Marriage list"></div>
+    <h3>Add a marriage (Trusted Members)</h3>
+    <ol>
+      <li>Click <strong>+ Record marriage</strong>.</li>
+      <li>Search for and select <strong>Person 1</strong> and <strong>Person 2</strong> using the search window. Use <strong>Choose (Without Henry)</strong> to show only persons not yet in the family tree.</li>
+      <li>Enter the marriage date and place.</li>
+      <li>Select the marriage status (Married, Divorced, etc.).</li>
+      <li>Upload a marriage certificate or divorce papers if available.</li>
+      <li>Click <strong>💾 Save</strong>.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/huwelikvorm.jpg' %}" alt="Marriage form with person search window"></div>
+
+    <h2 id="en-relationships">7. Relationships</h2>
+    <p>Relationships link parents to children. Without relationships, Henry numbers will not be calculated.</p>
+    <h3>Add a relationship (Trusted Members)</h3>
+    <ol>
+      <li>Click <strong>+ Add relationship</strong>.</li>
+      <li>Select the <strong>Parent</strong> using the search window.</li>
+      <li>Select the <strong>Child</strong> — use <strong>Choose (Unconnected)</strong> to show only persons not yet linked.</li>
+      <li>Select the relationship type: <em>Parent</em>, <em>Adoptive Parent</em>, <em>Step Parent</em> or <em>Guardian</em>.</li>
+      <li>For adoptions and guardianships you can upload the relevant document.</li>
+      <li>Click <strong>💾 Save</strong>.</li>
+    </ol>
+    <div class="note">📌 The search window shows the Henry number of each person so you can more easily identify the correct person.</div>
+    <div class="screenshot"><img src="{% static 'core/img/verwantskapvorm.jpg' %}" alt="Relationship form"></div>
+
+    <h2 id="en-events">8. Events</h2>
+    <p>Events include births, deaths, baptisms, immigration, military service and graduation.</p>
+    <h3>Add an event (Trusted Members)</h3>
+    <ol>
+      <li>Click <strong>+ Add event</strong>.</li>
+      <li>Enter the title and select the event type.</li>
+      <li>Enter the date and place.</li>
+      <li>Select the <strong>Main Person</strong> — the document will be linked to this person.</li>
+      <li>Add other people involved under <strong>People</strong>.</li>
+      <li>Upload the relevant document (e.g. birth certificate).</li>
+      <li>Click <strong>💾 Save</strong>.</li>
+    </ol>
+    <div class="screenshot"><img src="{% static 'core/img/gebeurtenisvorm.jpg' %}" alt="Event form"></div>
+
+    <h2 id="en-documents">9. Documents</h2>
+    <p>Documents can be uploaded directly or are automatically linked when you save a marriage, relationship or event.</p>
+    <h3>Document types</h3>
+    <ul>
+      <li><strong>Manually uploadable:</strong> Census Record, Photo, Letter, Will, Other</li>
+      <li><strong>Automatically linked:</strong> Birth and baptism certificates, Marriage certificates, Divorce papers, Adoption papers, etc.</li>
+    </ul>
+    <h3>Search documents</h3>
+    <p>Use the <strong>🔍 Search</strong> button on the Document list to search by title, type, person or date.</p>
+    <div class="screenshot"><img src="{% static 'core/img/dokumentlys.jpg' %}" alt="Document search page"></div>
+
+    <h2 id="en-henry">10. Henry Numbering System</h2>
+    <p>The archive uses the Henry system to indicate each person's position in the family tree:</p>
+    <ul>
+      <li><strong>a1</strong> — The root ancestor (Jan Janse van Eeden)</li>
+      <li><strong>a1b1, a1b2, a1b3...</strong> — His children in birth order</li>
+      <li><strong>a1b1c1, a1b1c2...</strong> — Grandchildren</li>
+    </ul>
+    <p>Henry numbers appear on person cards, in the search windows and next to names in the family section of each profile. The last two pairs (e.g. <em>j2</em>) appear next to brothers, sisters and children for easy identification.</p>
+    <div class="note">📌 Henry numbers are calculated automatically based on the relationships in the archive. If a person has no Henry number, it means their parent connection has not yet been entered.</div>
+    <div class="screenshot"><img src="{% static 'core/img/personelys.jpg' %}" alt="People list with Henry numbers"></div>
+
+    <h2 id="en-tree">11. Family Tree and Map</h2>
+    <h3>Family Tree</h3>
+    <p>Click on <strong>Family Tree</strong> on any person's profile page to see their descendants as a visual tree. You can:</p>
+    <ul>
+      <li>Zoom in and out with the mouse wheel</li>
+      <li>Drag to move around</li>
+      <li>Click on a name to open that person's profile</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/familietree.jpg' %}" alt="Family tree view"></div>
+    <h3>Map</h3>
+    <p>The map view shows the geographical spread of birthplaces. Click on a point to see more information.</p>
+    <div class="screenshot"><img src="{% static 'core/img/kaart.jpg' %}" alt="Map view"></div>
+
+    <h2 id="en-blog">12. Blog</h2>
+    <p>The blog contains family news and articles in Afrikaans and/or English.</p>
+    <ul>
+      <li>All visitors can read the blog.</li>
+      <li>Only approved members can leave comments.</li>
+      <li>Only Trusted Members and Administrators can create posts.</li>
+    </ul>
+    <div class="screenshot"><img src="{% static 'core/img/blog.jpg' %}" alt="Blog page"></div>
+
+    <h2 id="en-gedcom">13. GEDCOM Import and Export</h2>
+    <p>GEDCOM is the standard format for exchanging genealogical data between systems.</p>
+    <h3>Export</h3>
+    <ol>
+      <li>Click <strong>Export GEDCOM</strong> on the dashboard.</li>
+      <li>A file named <em>van_eeden_familie.ged</em> will be downloaded.</li>
+      <li>This file contains all people, marriages, relationships and Henry numbers.</li>
+    </ol>
+    <h3>Import</h3>
+    <ol>
+      <li>Click <strong>Import GEDCOM</strong> on the dashboard.</li>
+      <li>Select your .ged file.</li>
+      <li>Click <strong>Import</strong>. The system will import all records and calculate Henry numbers.</li>
+    </ol>
+    <div class="note">📌 The import function is recommended only for the initial setup of the archive. Thereafter use the web interface directly.</div>
+
+  </div>
+  <!-- end lang-en -->
+
+</div>
+
+<script>
+function setLang(lang) {
+  document.querySelectorAll('.lang-af, .lang-en').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.manual-lang button').forEach(b => b.classList.remove('active'));
+  document.querySelector('.lang-' + lang).classList.add('active');
+  event.target.classList.add('active');
+}
+</script>
+{% endblock %}
