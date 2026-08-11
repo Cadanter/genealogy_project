@@ -1,9 +1,11 @@
 {% extends "genealogy/base.html" %}
 {% load static %}
-{% block title %}{{ title }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% load genealogy_extras %}
+{% block title %}Koppel kind — {{ parent.full_name }} — Van Eeden Familiegeskiedenis{% endblock %}
 {% block breadcrumb %}
   <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
-  <a href="{% url 'genealogy:person_list' %}">Mense</a> <span>›</span> {{ title }}
+  <a href="{{ parent.get_absolute_url }}">{{ parent.full_name }}</a> <span>›</span>
+  Koppel kind
 {% endblock %}
 
 {% block extra_css %}
@@ -11,33 +13,49 @@
 {% endblock %}
 
 {% block content %}
-<div class="ph"><div><h2>{{ title }}</h2><p class="subtitle">Vul in soveel of so min in as wat u weet.</p></div></div>
+<div class="ph"><div><h2>Koppel kind</h2><p class="subtitle">Voeg ʼn splinternuwe persoon by as kind, of koppel ʼn bestaande persoon in die argief.</p></div></div>
 
-{% if not live %}
-<div class="propose-banner">
-  ✎ <strong>U stel ʼn wysiging voor.</strong> U veranderinge sal deur ʼn familiebeheerder hersien word voordat dit sigbaar word.
+<!-- Ouer (vas, nie wysigbaar nie) -->
+<div class="card" style="margin-bottom:18px;">
+  <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;">Ouer</div>
+  <div class="pcard" style="max-width:260px;cursor:default;">
+    <div class="pcard-name">{{ parent.full_name }}</div>
+    <div class="pcard-dates" style="font-size:11px;">
+      {% if parent.birth_date %}geb. {{ parent.birth_year }}{% endif %}
+      {% if parent.is_deceased and parent.death_date %} – gest. {{ parent.death_year }}{% endif %}
+    </div>
+    {% if parent.birth_place %}<div style="font-size:11px;color:var(--muted);">{{ parent.birth_place }}</div>{% endif %}
+    <span class="badge badge-{% if parent.gender == 'M' %}male{% elif parent.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;">{{ parent.get_gender_display }}</span>
+  </div>
 </div>
-{% endif %}
 
+<!-- Oorskakel-knoppies -->
+<div style="display:flex;gap:8px;margin-bottom:18px;">
+  <button type="button" id="tab-new-btn" class="btn btn-sm" onclick="acShowTab('new')">Nuwe Inskrywing</button>
+  <button type="button" id="tab-existing-btn" class="btn btn-sm" onclick="acShowTab('existing')">Bestaande Inskrywing</button>
+</div>
+
+<!-- ═══════════════════ NUWE INSKRYWING (nuwe persoon) ═══════════════════ -->
+<div id="tab-new">
 <div class="card">
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
+    <input type="hidden" name="mode" value="new">
 
     <h3 style="margin-bottom:14px;">Basiese inligting</h3>
     <div class="form-grid">
       <div class="fg">
-        <label>Voornaam *</label>{{ form.first_name }}
-        {% if form.first_name.errors %}<small style="color:var(--rust)">{{ form.first_name.errors|join:", " }}</small>{% endif %}
+        <label>Voornaam *</label>{{ person_form.first_name }}
+        {% if person_form.first_name.errors %}<small style="color:var(--rust)">{{ person_form.first_name.errors|join:", " }}</small>{% endif %}
       </div>
-      <div class="fg"><label>Middel name</label>{{ form.middle_name }}</div>
+      <div class="fg"><label>Middel name</label>{{ person_form.middle_name }}</div>
       <div class="fg">
-        <label>Van *</label>{{ form.last_name }}
-        {% if form.last_name.errors %}<small style="color:var(--rust)">{{ form.last_name.errors|join:", " }}</small>{% endif %}
+        <label>Van *</label>{{ person_form.last_name }}
+        {% if person_form.last_name.errors %}<small style="color:var(--rust)">{{ person_form.last_name.errors|join:", " }}</small>{% endif %}
       </div>
-      <div class="fg"><label>Nooiensvan</label>{{ form.maiden_name }}</div>
-      <div class="fg"><label>Geslag</label>{{ form.gender }}</div>
-      {% if live %}<div class="fg"><label>Foto</label>{{ form.photo }}</div>{% endif %}
-      {% if live %}
+      <div class="fg"><label>Nooiensvan</label>{{ person_form.maiden_name }}</div>
+      <div class="fg"><label>Geslag</label>{{ person_form.gender }}</div>
+      <div class="fg"><label>Foto</label>{{ person_form.photo }}</div>
       <div class="fg" style="margin-bottom:14px;">
         <label>Foto Voorskou</label>
         <div id="photo-preview" style="margin-top:10px;display:none;">
@@ -45,7 +63,6 @@
           <p id="photo-preview-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></p>
         </div>
       </div>
-      {% endif %}
     </div>
 
     <h3 style="margin-top:22px;margin-bottom:14px;">Geboorte</h3>
@@ -54,14 +71,14 @@
         <label>Geboortedatum</label>
         <input type="text" id="birth_date_display" name="birth_date_display"
                class="gedcom-date" placeholder="Klik om datum te kies…"
-               value="{{ form.birth_date.value|default:'' }}">
+               value="{{ person_form.birth_date.value|default:'' }}">
         <input type="hidden" name="birth_date" id="birth_date"
-               value="{{ form.birth_date.value|default:'' }}">
+               value="{{ person_form.birth_date.value|default:'' }}">
         <div class="gdp-age" id="age-display"></div>
       </div>
-      <div class="fg"><label>Geboorte­plek</label>{{ form.birth_place }}</div>
+      <div class="fg"><label>Geboorte­plek</label>{{ person_form.birth_place }}</div>
     </div>
-    <div id="birth-doc-section" style="display:none;">
+    <div id="birth-doc-section" style="display:block;">
       <button type="button" onclick="toggleDocSection('birth-doc-section', 'birth-doc-content')" style="background:none;border:none;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:8px 0;margin-bottom:8px;">
         + Voeg Geboortesertifikaat by (Opsioneel)
       </button>
@@ -90,7 +107,7 @@
     <div class="form-grid">
       <div class="fg" style="align-items:flex-start;padding-top:8px;">
         <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;cursor:pointer;">
-          {{ form.is_deceased }} Merk as oorlede
+          {{ person_form.is_deceased }} Merk as oorlede
         </label>
       </div>
       <div class="fg"></div>
@@ -101,11 +118,11 @@
           <label>Sterfdatum</label>
           <input type="text" id="death_date_display" name="death_date_display"
                  class="gedcom-date" placeholder="Klik om datum te kies…"
-                 value="{{ form.death_date.value|default:'' }}">
+                 value="{{ person_form.death_date.value|default:'' }}">
           <input type="hidden" name="death_date" id="death_date"
-                 value="{{ form.death_date.value|default:'' }}">
+                 value="{{ person_form.death_date.value|default:'' }}">
         </div>
-        <div class="fg"><label>Sterfplek</label>{{ form.death_place }}</div>
+        <div class="fg"><label>Sterfplek</label>{{ person_form.death_place }}</div>
       </div>
       <div id="death-doc-section" style="display:none;">
         <button type="button" onclick="toggleDocSection('death-doc-section', 'death-doc-content')" style="background:none;border:none;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:8px 0;margin-bottom:8px;">
@@ -135,45 +152,91 @@
 
     <h3 style="margin-top:22px;margin-bottom:14px;">Biografie en aantekeninge</h3>
     <div class="form-grid">
-      <div class="fg full"><label>Biografie</label>{{ form.biography }}</div>
-      <div class="fg full"><label>Aantekeninge</label>{{ form.notes }}</div>
+      <div class="fg full"><label>Biografie</label>{{ person_form.biography }}</div>
+      <div class="fg full"><label>Aantekeninge</label>{{ person_form.notes }}</div>
     </div>
 
     <div class="fg full" style="margin-top:18px;">
-      <label>{% if live %}Wysigingsopsomming (opsioneel){% else %}Waarom stel u hierdie wysiging voor?{% endif %}</label>
+      <label>Wysigingsopsomming (opsioneel)</label>
       <input type="text" name="note" placeholder="Kort beskrywing van hierdie wysiging…">
     </div>
 
-    {% if profile.is_admin and show_root_checkbox %}
-    <div class="fg" style="margin-bottom:14px;">
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-        <input type="checkbox" name="is_root"
-               {% if person.is_root %}checked{% endif %}
-               style="width:16px;height:16px;">
-        <span>Stam-ouer van die boom <span style="font-family:monospace;font-size:12px;color:var(--muted);">(a1)</span></span>
-      </label>
-      <small style="color:var(--muted);display:block;margin-top:4px;">
-        Slegs een persoon moet as stam-ouer gemerk word. Henry-nommers word van hierdie persoon af bereken.
-      </small>
-    </div>
-    {% endif %}
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">
-        {% if live %}💾 Stoor{% else %}↑ Dien voorstel in{% endif %}
-      </button>
-      {% if person %}
-        <a href="{{ person.get_absolute_url }}" class="btn btn-secondary">Kanselleer</a>
-      {% else %}
-        <a href="{% url 'genealogy:person_list' %}" class="btn btn-secondary">Kanselleer</a>
-      {% endif %}
+      <button type="submit" class="btn btn-primary">💾 Stoor</button>
+      <a href="{{ parent.get_absolute_url }}" class="btn btn-secondary">Kanselleer</a>
     </div>
   </form>
 </div>
+</div>
+
+<!-- ═══════════════════ BESTAANDE INSKRYWING (bestaande persoon) ═══════════════════ -->
+<div id="tab-existing" style="display:none;">
+<div class="card" style="max-width:580px;">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="existing">
+    <input type="hidden" name="person" value="{{ parent.pk }}">
+
+    <!-- Kind picker with unconnected filter -->
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Kind</label>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="relative-search" placeholder="Soek naam…" style="flex:1;" autocomplete="off">
+        <button type="button" class="btn btn-secondary" onclick="spOpenRelative('all')">Kies (Almal)</button>
+        <button type="button" class="btn btn-secondary" onclick="spOpenRelative('unconnected')">Kies (Onverbind)</button>
+      </div>
+      <div id="relative-selected" style="margin-bottom:8px;"></div>
+      <input type="hidden" name="relative" id="relative-value" value="{{ relationship_form.relative.value|default:'' }}">
+      {% if relationship_form.relative.errors %}<small style="color:var(--rust)">{{ relationship_form.relative.errors|join:", " }}</small>{% endif %}
+    </div>
+
+    <div class="fg" style="margin-bottom:14px;">
+      <label>{{ relationship_form.relationship_type.label }}</label>
+      {{ relationship_form.relationship_type }}
+      {% if relationship_form.relationship_type.errors %}<small style="color:var(--rust)">{{ relationship_form.relationship_type.errors|join:", " }}</small>{% endif %}
+    </div>
+
+    <div class="fg" style="margin-bottom:14px;">
+      <label>{{ relationship_form.notes.label }}</label>
+      {{ relationship_form.notes }}
+      {% if relationship_form.notes.errors %}<small style="color:var(--rust)">{{ relationship_form.notes.errors|join:", " }}</small>{% endif %}
+    </div>
+
+    <div class="fg full" style="margin-bottom:14px;">
+      <label>Wysigingsopsomming (opsioneel)</label>
+      <input type="text" name="note" placeholder="Kort beskrywing van hierdie wysiging…">
+    </div>
+
+    <!-- New document upload (adoptions and guardianships only) -->
+    <div id="rel-doc-section" style="display:none;">
+      <hr style="margin:20px 0;border-color:var(--border);">
+      <h4 id="rel-doc-title" style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;"></h4>
+      {% include "genealogy/_doc_upload.html" %}
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">💾 Stoor</button>
+      <a href="{{ parent.get_absolute_url }}" class="btn btn-secondary">Kanselleer</a>
+    </div>
+  </form>
+</div>
+</div>
+
+{% include "genealogy/_sp_modal.html" %}
 
 <script src="{% static 'genealogy/js/gedcom_datepicker.js' %}"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
-  /* toggle death fields based on is_deceased checkbox */
+  /* ── Tab switching ─────────────────────────────────────────────────── */
+  function acShowTab(tab) {
+    document.getElementById('tab-new').style.display      = (tab === 'new')      ? 'block' : 'none';
+    document.getElementById('tab-existing').style.display  = (tab === 'existing') ? 'block' : 'none';
+    document.getElementById('tab-new-btn').className      = 'btn btn-sm ' + (tab === 'new'      ? 'btn-primary' : 'btn-secondary');
+    document.getElementById('tab-existing-btn').className = 'btn btn-sm ' + (tab === 'existing' ? 'btn-primary' : 'btn-secondary');
+  }
+  acShowTab('{{ mode|default:"new" }}');
+
+  /* ── toggle death fields based on is_deceased checkbox ────────────── */
   const isDeceasedCheckbox = document.querySelector('input[name="is_deceased"]');
   const deathFields = document.getElementById('death-fields');
   const deathDocSection = document.getElementById('death-doc-section');
@@ -190,13 +253,12 @@
 
   if (isDeceasedCheckbox) {
     isDeceasedCheckbox.addEventListener('change', toggleDeathFields);
-    // Show fields if already checked on page load
     if (isDeceasedCheckbox.checked) {
       toggleDeathFields();
     }
   }
 
-  /* toggle collapsible doc sections */
+  /* ── toggle collapsible doc sections ───────────────────────────────── */
   function toggleDocSection(sectionId, contentId) {
     const section = document.getElementById(sectionId);
     const content = document.getElementById(contentId);
@@ -207,10 +269,7 @@
     }
   }
 
-  /* show birth doc button on load */
-  document.getElementById('birth-doc-section').style.display = 'block';
-
-  /* photo preview handler */
+  /* ── photo preview handler ─────────────────────────────────────────── */
   const photoInput = document.querySelector('input[name="photo"]');
   if (photoInput) {
     const photoPreview = document.getElementById('photo-preview');
@@ -232,7 +291,7 @@
     });
   }
 
-  /* wire age display between birth and death pickers */
+  /* ── age display between birth and death pickers ───────────────────── */
   const birthInp = document.getElementById('birth_date_display');
   const deathInp = document.getElementById('death_date_display');
   const ageEl    = document.getElementById('age-display');
@@ -246,7 +305,7 @@
   birthInp.addEventListener('change', refreshAge);
   deathInp.addEventListener('change', refreshAge);
 
-  /* document preview handlers */
+  /* ── document preview handlers (birth / death certs) ────────────────── */
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   function setupDocPreview(prefix) {
@@ -292,5 +351,23 @@
 
   setupDocPreview('birth');
   setupDocPreview('death');
+
+  /* ── relationship_type -> optional doc upload toggle (existing tab) ── */
+  (function() {
+    var sel = document.querySelector('select[name="relationship_type"]');
+    var sec = document.getElementById('rel-doc-section');
+    var ttl = document.getElementById('rel-doc-title');
+    var labels = {
+      'adoptive_parent': 'Voeg Aanneming Papiere by (Opsioneel)',
+      'guardian':        'Voeg Voogdyskap Papiere by (Opsioneel)',
+    };
+    function toggle() {
+      var v = sel ? sel.value : '';
+      var show = v === 'adoptive_parent' || v === 'guardian';
+      sec.style.display = show ? 'block' : 'none';
+      if (show) ttl.textContent = labels[v] || 'Voeg Dokument by (Opsioneel)';
+    }
+    if (sel) { sel.addEventListener('change', toggle); toggle(); }
+  })();
 </script>
 {% endblock %}

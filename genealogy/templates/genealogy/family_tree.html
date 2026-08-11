@@ -28,7 +28,7 @@ const W = el.clientWidth, H = el.clientHeight || 600;
 const svg = d3.select('#tree-container').append('svg').attr('width', W).attr('height', H);
 const g   = svg.append('g').attr('transform', `translate(${W/2},60)`);
 svg.call(d3.zoom().scaleExtent([.25, 2]).on('zoom', e => g.attr('transform', e.transform)));
-const tree = d3.tree().nodeSize([160, 110]);
+const tree = d3.tree().nodeSize([80, 90]);
 const root = d3.hierarchy(data);
 tree(root);
 g.selectAll('.link').data(root.links()).join('path').attr('class', 'link')
@@ -38,19 +38,22 @@ const node = g.selectAll('.node').data(root.descendants()).join('g')
   .attr('transform', d => `translate(${d.x},${d.y})`)
   .style('cursor', 'pointer')
   .on('click', (e, d) => { if (d.data.url) window.location.href = d.data.url; });
-node.append('circle').attr('r', 26);
+node.append('circle').attr('r', 13);
 node.append('text').attr('text-anchor', 'middle').attr('dy', '0.35em')
   .style('font-size', '16px')
   .text(d => d.data.gender === 'F' ? '♀' : d.data.gender === 'M' ? '♂' : '⊙');
-node.append('text').attr('dy', 42).attr('text-anchor', 'middle')
-  .style('font-family', "'DM Sans',sans-serif").style('font-size', '11.5px').style('fill', '#1c1710')
+node.append('text').attr('dy', 24).attr('text-anchor', 'middle')
+  .style('font-family', "'DM Sans',sans-serif").style('font-size', '10px').style('fill', '#a8842f')
+  .text(d => d.data.short_henry || '');
+node.append('text').attr('dy', 36).attr('text-anchor', 'middle')
+  .style('font-family', "'DM Sans',sans-serif").style('font-size', '11.5px').style('fill', '#7a5c2e')
   .text(d => d.data.first_name || '');
-node.append('text').attr('dy', 56).attr('text-anchor', 'middle')
-  .style('font-size', '11.5px').style('fill', '#1c1710')
-  .text(d => d.data.middle_name || '');
+node.append('text').attr('dy', 50).attr('text-anchor', 'middle')
+  .style('font-size', '11.5px').style('fill', '#7a5c2e')
+  .text(d => d.data.middle_name.substring(0, 12) || '');
 
 node.append('text').attr('text-anchor', 'middle')
-  .attr('dy', d => d.data.middle_name ? 70 : 56)
+  .attr('dy', d => d.data.middle_name ? 64 : 50)
   .style('font-size', '10px').style('fill', '#7a5c2e')
   .text(d => {
     const b = d.data.birth_year, dt = d.data.death_year;

@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from django.shortcuts import render, get_object_or_404, redirect
+from django.db import transaction
 from django.db.models import Q
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -413,12 +414,17 @@ def person_create(request):
         messages.error(request, 'U rekening wag op goedkeuring.')
         return redirect('genealogy:person_list')
     if profile.can_edit:
+        root_exists = Person.objects.filter(is_root=True).exists()
+        show_root_checkbox = not root_exists
         if request.method == 'POST':
             form = PersonForm(request.POST, request.FILES)
             if form.is_valid():
                 person = form.save(commit=False)
                 person.created_by = request.user
                 person.save()
+                if profile.is_admin and show_root_checkbox and 'is_root' in request.POST:
+                    person.is_root = True
+                    person.save(update_fields=['is_root'])
                 _create_person_document(request, person, 'birth')
                 _create_person_document(request, person, 'death')
                 record_audit(request.user, 'create', person, note=request.POST.get('note',''))
@@ -427,7 +433,8 @@ def person_create(request):
         else:
             form = PersonForm()
         return render(request, 'genealogy/person_form.html',
-            {'form': form, 'title': 'Voeg persoon by', 'live': True, 'profile': profile})
+            {'form': form, 'title': 'Voeg persoon by', 'live': True, 'profile': profile,
+            'show_root_checkbox': show_root_checkbox})
     else:
         if request.method == 'POST':
             form = ProposePersonForm(request.POST)
@@ -455,10 +462,19 @@ def person_edit(request, pk):
         return redirect('genealogy:person_detail', pk=pk)
     if profile.can_edit:
         old_data = model_to_dict_simple(person)
+        other_root_exists = Person.objects.filter(is_root=True).exclude(pk=person.pk).exists()
+        show_root_checkbox = not other_root_exists
         if request.method == 'POST':
             form = PersonForm(request.POST, request.FILES, instance=person)
             if form.is_valid():
                 updated = form.save()
+                if profile.is_admin and show_root_checkbox:
+                    new_is_root = 'is_root' in request.POST
+                    if updated.is_root != new_is_root:
+                        if new_is_root:
+                            Person.objects.filter(is_root=True).exclude(pk=updated.pk).update(is_root=False)
+                        updated.is_root = new_is_root
+                        updated.save(update_fields=['is_root'])
                 _create_person_document(request, updated, 'birth')
                 _create_person_document(request, updated, 'death')
                 record_audit(request.user, 'update', updated,
@@ -470,7 +486,7 @@ def person_edit(request, pk):
             form = PersonForm(instance=person)
         return render(request, 'genealogy/person_form.html',
             {'form': form, 'title': 'Wysig persoon', 'person': person,
-            'live': True, 'profile': profile})
+            'live': True, 'profile': profile, 'show_root_checkbox': show_root_checkbox})
     else:
         old_data = model_to_dict_simple(person)
         if request.method == 'POST':
@@ -505,6 +521,164 @@ def person_delete(request, pk):
         messages.success(request, f'{name} is uit die argief verwyder.')
         return redirect('genealogy:person_list')
     return render(request, 'genealogy/person_confirm_delete.html', {'person': person})
+
+
+@login_required
+def person_add_child(request, pk):
+    """Koppel 'n kind aan 'n ouer — as 'n splinternuwe persoon, of as 'n bestaande persoon."""
+    profile = get_profile(request.user)
+    parent  = get_object_or_404(Person, pk=pk)
+
+    if not profile.is_approved:
+        messages.error(request, 'U rekening wag op goedkeuring.')
+        return redirect('genealogy:person_detail', pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan kinders koppel.')
+        return redirect('genealogy:person_detail', pk=pk)
+
+    mode = 'new'
+    person_form       = PersonForm()
+    relationship_form = RelationshipForm()
+
+    if request.method == 'POST':
+        mode = request.POST.get('mode', 'new')
+
+        if mode == 'new':
+            person_form = PersonForm(request.POST, request.FILES)
+            if person_form.is_valid():
+                child = person_form.save(commit=False)
+                child.created_by = request.user
+                child.save()
+                _create_person_document(request, child, 'birth')
+                _create_person_document(request, child, 'death')
+                record_audit(request.user, 'create', child, note=request.POST.get('note', ''))
+
+                rel = Relationship.objects.create(
+                    person=parent, relative=child, relationship_type='parent',
+                )
+                record_audit(request.user, 'create', rel)
+
+                messages.success(request, f'{child.full_name} is as kind van {parent.full_name} bygevoeg.')
+                return redirect('genealogy:person_detail', pk=parent.pk)
+
+        elif mode == 'existing':
+            relationship_form = RelationshipForm(request.POST, request.FILES)
+            if relationship_form.is_valid():
+                rel = relationship_form.save(commit=False)
+                rel.person = parent
+                rel.save()
+                _create_relationship_document(request, rel)
+                record_audit(request.user, 'create', rel, note=request.POST.get('note', ''))
+
+                messages.success(request, f'{rel.relative.full_name} is as kind van {parent.full_name} gekoppel.')
+                return redirect('genealogy:person_detail', pk=parent.pk)
+
+    # Data for the "Bestaande Inskrywing" (existing person) picker
+    connected_child_pks = Relationship.objects.values_list('relative__pk', flat=True)
+    unconnected_people = Person.objects.exclude(pk__in=connected_child_pks).exclude(pk=parent.pk) \
+        .order_by('first_name', 'last_name')
+    all_people = Person.objects.exclude(pk=parent.pk).order_by('first_name', 'last_name')
+
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+
+    return render(request, 'genealogy/person_add_child.html', {
+        'parent': parent,
+        'person_form': person_form,
+        'relationship_form': relationship_form,
+        'profile': profile,
+        'mode': mode,
+        'unconnected_people': unconnected_people,
+        'all_people': all_people,
+        'henry_map': henry_map,
+    })
+
+
+@login_required
+def person_add_spouse(request, pk):
+    """Voeg 'n gade by 'n persoon — as 'n splinternuwe persoon, of as 'n bestaande persoon."""
+    profile = get_profile(request.user)
+    person1 = get_object_or_404(Person, pk=pk)
+
+    if not profile.is_approved:
+        messages.error(request, 'U rekening wag op goedkeuring.')
+        return redirect('genealogy:person_detail', pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan gades koppel.')
+        return redirect('genealogy:person_detail', pk=pk)
+
+    mode = 'new'
+    person_form         = PersonForm()
+    marriage_form_new      = MarriageForm(auto_id='mnew_%s')
+    marriage_form_existing = MarriageForm(auto_id='mexist_%s')
+
+    if request.method == 'POST':
+        mode = request.POST.get('mode', 'new')
+
+        if mode == 'new':
+            person_form = PersonForm(request.POST, request.FILES)
+            if person_form.is_valid():
+                with transaction.atomic():
+                    sid = transaction.savepoint()
+                    spouse = person_form.save(commit=False)
+                    spouse.created_by = request.user
+                    spouse.save()
+
+                    m_data = request.POST.copy()
+                    m_data['person1'] = str(person1.pk)
+                    m_data['person2'] = str(spouse.pk)
+                    m_data['notes']   = request.POST.get('marriage_notes', '')
+                    marriage_form_new = MarriageForm(m_data, auto_id='mnew_%s')
+
+                    if marriage_form_new.is_valid():
+                        marriage = marriage_form_new.save()
+                        _create_person_document(request, spouse, 'birth')
+                        _create_person_document(request, spouse, 'death')
+                        _create_marriage_document(request, marriage)
+                        record_audit(request.user, 'create', spouse, note=request.POST.get('note', ''))
+                        record_audit(request.user, 'create', marriage)
+                        transaction.savepoint_commit(sid)
+                        messages.success(request, f'{spouse.full_name} is as gade van {person1.full_name} bygevoeg.')
+                        return redirect('genealogy:person_detail', pk=person1.pk)
+                    else:
+                        transaction.savepoint_rollback(sid)
+                        # Re-bind an unsaved copy so the person fields redisplay with entered data
+                        person_form = PersonForm(request.POST, request.FILES)
+                        person_form.is_valid()
+
+        elif mode == 'existing':
+            m_data = request.POST.copy()
+            m_data['person1'] = str(person1.pk)
+            marriage_form_existing = MarriageForm(m_data, auto_id='mexist_%s')
+            if marriage_form_existing.is_valid():
+                marriage = marriage_form_existing.save()
+                _create_marriage_document(request, marriage)
+                record_audit(request.user, 'create', marriage, note=request.POST.get('note', ''))
+                messages.success(request, f'{marriage.person2.full_name} is as gade van {person1.full_name} gekoppel.')
+                return redirect('genealogy:person_detail', pk=person1.pk)
+
+    from .henry import compute_henry_for_tree
+    henry_map = {}
+    root = Person.objects.filter(is_root=True).first()
+    if root:
+        henry_map = compute_henry_for_tree(root)
+    all_people = list(Person.objects.exclude(pk=person1.pk).order_by('first_name', 'last_name'))
+    no_henry_people = [p for p in all_people if p.pk not in henry_map]
+
+    return render(request, 'genealogy/person_add_spouse.html', {
+        'person1': person1,
+        'person_form': person_form,
+        'marriage_form_new': marriage_form_new,
+        'marriage_form_existing': marriage_form_existing,
+        'profile': profile,
+        'mode': mode,
+        'all_people': all_people,
+        'no_henry_people': no_henry_people,
+        'henry_map': henry_map,
+    })
 
 
 # ─── Admin: members ───────────────────────────────────────────────────────────
@@ -1112,6 +1286,20 @@ def family_tree_data(request, pk):
     profile = get_profile(request.user)
     person  = get_object_or_404(Person, pk=pk)
 
+    from .henry import compute_henry_for_tree
+    import re as _re
+    root = Person.objects.filter(is_root=True).first()
+    henry_map = compute_henry_for_tree(root) if root else {}
+
+    def _short_henry(p, pairs=1):
+        hn = henry_map.get(p.pk, '')
+        if not hn:
+            return ''
+        parts = _re.findall(r'[a-z]+\d+', hn)
+        if not parts:
+            return ''
+        return ''.join(parts[-pairs:]) if len(parts) >= pairs else ''.join(parts)
+
     def build_node(p, depth=0, max_depth=4, visited=None):
         if visited is None: visited = set()
         if p.pk in visited or depth > max_depth: return None
@@ -1122,6 +1310,7 @@ def family_tree_data(request, pk):
             'middle_name': p.middle_name,
             'last_name': p.last_name,
             'birth_year': p.birth_year, 'death_year': p.death_year,
+            'short_henry': _short_henry(p, 1),
             'url': p.get_absolute_url(), 'children': [],
         }
         for child in p.get_children():

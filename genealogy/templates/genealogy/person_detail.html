@@ -84,7 +84,10 @@
     {% endif %}
 
     <div class="card">
-      <h3>Familie</h3>
+      <h3>Familie van {{ person.full_name }} 
+        {% if person.maiden_name %}<i>(nee {{ person.maiden_name }})</i>{% endif %} 
+        {% if henry_number %}<p style="font-size:12px; font-family:monospace; color:var(--muted)">({{ henry_number }})</p>{% endif %}
+      </h3>
       {% if parents %}
       <div style="margin-bottom:14px">
         <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:5px">Ouers</div>
@@ -92,7 +95,7 @@
           {% for p in parents %}
           <a href="{{ p.person.get_absolute_url }}" class="flink">
             ⊙ {{ p.person.full_name }}
-            {% if p.person.maiden_name %} (nee {{ p.person.maiden_name }}){% endif %}
+            {% if p.person.maiden_name %} <i>(nee {{ p.person.maiden_name }})</i>{% endif %}
             {% if p.short_henry %}<span style="font-size:10px;font-family:monospace;opacity:.6;margin-left:3px;">({{ p.short_henry }})</span>{% endif %}
           </a>
           {% endfor %}
@@ -106,7 +109,7 @@
           {% for p in non_blood_parents %}
           <a href="{{ p.person.get_absolute_url }}" class="flink">
             ⊙ {{ p.person.full_name }}
-            {% if p.person.maiden_name %} (nee {{ p.person.maiden_name }}){% endif %}
+            {% if p.person.maiden_name %} <i>(nee {{ p.person.maiden_name }})</i>{% endif %}
             <span style="font-size:10.5px;opacity:.6;">({{ p.label }}{% if p.short_henry %} · {{ p.short_henry }}{% endif %})</span>
           </a>
           {% endfor %}
@@ -120,7 +123,7 @@
           {% for item in spouses %}
           <a href="{{ item.person.get_absolute_url }}" class="flink">
             ∞ {{ item.person.full_name }}
-            {% if item.person.maiden_name %} (nee {{ item.person.maiden_name }}){% endif %}
+            {% if item.person.maiden_name %} <i>(nee {{ item.person.maiden_name }})</i>{% endif %}
             <span style="font-size:10.5px;opacity:.6">({{ item.marriage.get_status_display }})</span>
           </a>
           {% endfor %}
@@ -134,7 +137,7 @@
     {% for c in children %}
     <a href="{{ c.person.get_absolute_url }}" class="flink">
       ⊙ {{ c.person.full_name }}
-      {% if c.person.maiden_name %} (nee {{ c.person.maiden_name }}){% endif %}
+      {% if c.person.maiden_name %} <i>(nee {{ c.person.maiden_name }})</i>{% endif %}
       {% if c.short_henry %}<span style="font-size:10px;font-family:monospace;opacity:.6;margin-left:3px;">({{ c.short_henry }})</span>{% endif %}
     </a>
     {% endfor %}
@@ -148,7 +151,7 @@
     {% for c in non_blood_children %}
     <a href="{{ c.person.get_absolute_url }}" class="flink">
       ⊙ {{ c.person.full_name }}
-      {% if c.person.maiden_name %} (nee {{ c.person.maiden_name }}){% endif %}
+      {% if c.person.maiden_name %} <i>(nee {{ c.person.maiden_name }})</i>{% endif %}
       <span style="font-size:10.5px;opacity:.6;">({{ c.label }}{% if c.short_henry %} · {{ c.short_henry }}{% endif %})</span>
     </a>
     {% endfor %}
@@ -162,7 +165,7 @@
           {% for s in siblings %}
           <a href="{{ s.person.get_absolute_url }}" class="flink">
             ⊙ {{ s.person.full_name }}
-            {% if s.person.maiden_name %} (nee {{ s.person.maiden_name }}){% endif %}
+            {% if s.person.maiden_name %} <i>(nee {{ s.person.maiden_name }})</i>{% endif %}
             <span style="font-size:10.5px;opacity:.6;">({{ s.label }}{% if s.short_henry %} · {{ s.short_henry }}{% endif %})</span>
           </a>
           {% endfor %}
@@ -175,8 +178,8 @@
 
     {% if profile and profile.can_edit %}
       <div style="margin-top:10px;display:flex;gap:8px;">
-        <a href="{% url 'genealogy:relationship_create' %}?person={{ person.pk }}" class="btn btn-secondary btn-sm">+ Koppel kind</a>
-        <a href="{% url 'genealogy:marriage_create' %}?person1={{ person.pk }}" class="btn btn-secondary btn-sm">+ Voeg gade by</a>
+        <a href="{% url 'genealogy:person_add_child' person.pk %}" class="btn btn-secondary btn-sm">+ Koppel kind</a>
+        <a href="{% url 'genealogy:person_add_spouse' person.pk %}" class="btn btn-secondary btn-sm">+ Voeg gade by</a>
       </div>
     {% endif %}
       

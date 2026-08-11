@@ -1,0 +1,457 @@
+{% extends "genealogy/base.html" %}
+{% load static %}
+{% block title %}Voeg gade by — {{ person1.full_name }} — Van Eeden Familiegeskiedenis{% endblock %}
+{% block breadcrumb %}
+  <a href="{% url 'genealogy:dashboard' %}">Tuiste</a> <span>›</span>
+  <a href="{{ person1.get_absolute_url }}">{{ person1.full_name }}</a> <span>›</span>
+  Voeg gade by
+{% endblock %}
+
+{% block extra_css %}
+  <link rel="stylesheet" href="{% static 'genealogy/css/datepicker.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ph"><div><h2>Voeg gade by</h2><p class="subtitle">Voeg ʼn splinternuwe persoon by as gade, of koppel ʼn bestaande persoon in die argief.</p></div></div>
+
+<!-- Persoon 1 (vas, nie wysigbaar nie) -->
+<div class="card" style="margin-bottom:18px;">
+  <div style="font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:8px;">Persoon 1</div>
+  <div class="pcard" style="max-width:260px;cursor:default;">
+    <div class="pcard-name">{{ person1.full_name }}</div>
+    <div class="pcard-dates" style="font-size:11px;">
+      {% if person1.birth_date %}geb. {{ person1.birth_year }}{% endif %}
+      {% if person1.is_deceased and person1.death_date %} – gest. {{ person1.death_year }}{% endif %}
+    </div>
+    {% if person1.birth_place %}<div style="font-size:11px;color:var(--muted);">{{ person1.birth_place }}</div>{% endif %}
+    <span class="badge badge-{% if person1.gender == 'M' %}male{% elif person1.gender == 'F' %}female{% else %}viewer{% endif %}" style="margin-top:4px;">{{ person1.get_gender_display }}</span>
+  </div>
+</div>
+
+<!-- Oorskakel-knoppies -->
+<div style="display:flex;gap:8px;margin-bottom:18px;">
+  <button type="button" id="tab-new-btn" class="btn btn-sm" onclick="asShowTab('new')">Nuwe Inskrywing</button>
+  <button type="button" id="tab-existing-btn" class="btn btn-sm" onclick="asShowTab('existing')">Bestaande Inskrywing</button>
+</div>
+
+<!-- ═══════════════════ NUWE INSKRYWING (nuwe persoon) ═══════════════════ -->
+<div id="tab-new">
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="new">
+
+    <h3 style="margin-bottom:14px;">Basiese inligting van gade</h3>
+    <div class="form-grid">
+      <div class="fg">
+        <label>Voornaam *</label>{{ person_form.first_name }}
+        {% if person_form.first_name.errors %}<small style="color:var(--rust)">{{ person_form.first_name.errors|join:", " }}</small>{% endif %}
+      </div>
+      <div class="fg"><label>Middel name</label>{{ person_form.middle_name }}</div>
+      <div class="fg">
+        <label>Van *</label>{{ person_form.last_name }}
+        {% if person_form.last_name.errors %}<small style="color:var(--rust)">{{ person_form.last_name.errors|join:", " }}</small>{% endif %}
+      </div>
+      <div class="fg"><label>Nooiensvan</label>{{ person_form.maiden_name }}</div>
+      <div class="fg"><label>Geslag</label>{{ person_form.gender }}</div>
+      <div class="fg"><label>Foto</label>{{ person_form.photo }}</div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Foto Voorskou</label>
+        <div id="photo-preview" style="margin-top:10px;display:none;">
+          <img id="photo-img-preview" style="max-width:200px;max-height:150px;border:1px solid var(--border);border-radius:4px;">
+          <p id="photo-preview-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></p>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:22px;margin-bottom:14px;">Geboorte</h3>
+    <div class="form-grid">
+      <div class="fg" style="position:relative;">
+        <label>Geboortedatum</label>
+        <input type="text" id="birth_date_display" name="birth_date_display"
+               class="gedcom-date" placeholder="Klik om datum te kies…"
+               value="{{ person_form.birth_date.value|default:'' }}">
+        <input type="hidden" name="birth_date" id="birth_date"
+               value="{{ person_form.birth_date.value|default:'' }}">
+        <div class="gdp-age" id="age-display"></div>
+      </div>
+      <div class="fg"><label>Geboorte­plek</label>{{ person_form.birth_place }}</div>
+    </div>
+    <div id="birth-doc-section" style="display:block;">
+      <button type="button" onclick="toggleDocSection('birth-doc-section', 'birth-doc-content')" style="background:none;border:none;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:8px 0;margin-bottom:8px;">
+        + Voeg Geboortesertifikaat by (Opsioneel)
+      </button>
+      <div id="birth-doc-content" style="display:none;">
+        <div class="fg" style="margin-bottom:14px;">
+          <label>Lêer</label>
+          <input type="file" name="birth_doc_file" id="birth-doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
+          <div id="birth-doc-preview" style="margin-top:10px;display:none;">
+            <canvas id="birth-doc-canvas" style="max-width:200px;border:1px solid var(--border);border-radius:4px;"></canvas>
+            <img id="birth-doc-img-preview" style="max-width:200px;max-height:150px;border:1px solid var(--border);border-radius:4px;display:none;">
+            <p id="birth-doc-preview-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></p>
+          </div>
+        </div>
+        <div class="fg" style="margin-bottom:14px;">
+          <label>Dokumenttitel (opsioneel)</label>
+          <input type="text" name="birth_doc_title" placeholder="Laat leeg vir outomatiese titel…">
+        </div>
+        <div class="fg" style="margin-bottom:14px;">
+          <label>Beskrywing (opsioneel)</label>
+          <textarea name="birth_doc_description" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:22px;margin-bottom:14px;">Afsterwe</h3>
+    <div class="form-grid">
+      <div class="fg" style="align-items:flex-start;padding-top:8px;">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:13px;cursor:pointer;">
+          {{ person_form.is_deceased }} Merk as oorlede
+        </label>
+      </div>
+      <div class="fg"></div>
+    </div>
+    <div id="death-fields" style="display:none;">
+      <div class="form-grid">
+        <div class="fg" style="position:relative;">
+          <label>Sterfdatum</label>
+          <input type="text" id="death_date_display" name="death_date_display"
+                 class="gedcom-date" placeholder="Klik om datum te kies…"
+                 value="{{ person_form.death_date.value|default:'' }}">
+          <input type="hidden" name="death_date" id="death_date"
+                 value="{{ person_form.death_date.value|default:'' }}">
+        </div>
+        <div class="fg"><label>Sterfplek</label>{{ person_form.death_place }}</div>
+      </div>
+      <div id="death-doc-section" style="display:none;">
+        <button type="button" onclick="toggleDocSection('death-doc-section', 'death-doc-content')" style="background:none;border:none;color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.05em;cursor:pointer;padding:8px 0;margin-bottom:8px;">
+          + Voeg Doodsertifikaat by (Opsioneel)
+        </button>
+        <div id="death-doc-content" style="display:none;">
+          <div class="fg" style="margin-bottom:14px;">
+            <label>Lêer</label>
+            <input type="file" name="death_doc_file" id="death-doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
+            <div id="death-doc-preview" style="margin-top:10px;display:none;">
+              <canvas id="death-doc-canvas" style="max-width:200px;border:1px solid var(--border);border-radius:4px;"></canvas>
+              <img id="death-doc-img-preview" style="max-width:200px;max-height:150px;border:1px solid var(--border);border-radius:4px;display:none;">
+              <p id="death-doc-preview-name" style="font-size:11px;color:var(--muted);margin-top:4px;"></p>
+            </div>
+          </div>
+          <div class="fg" style="margin-bottom:14px;">
+            <label>Dokumenttitel (opsioneel)</label>
+            <input type="text" name="death_doc_title" placeholder="Laat leeg vir outomatiese titel…">
+          </div>
+          <div class="fg" style="margin-bottom:14px;">
+            <label>Beskrywing (opsioneel)</label>
+            <textarea name="death_doc_description" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <h3 style="margin-top:22px;margin-bottom:14px;">Biografie en aantekeninge</h3>
+    <div class="form-grid">
+      <div class="fg full"><label>Biografie</label>{{ person_form.biography }}</div>
+      <div class="fg full"><label>Aantekeninge (persoon)</label>{{ person_form.notes }}</div>
+    </div>
+
+    <h3 style="margin-top:22px;margin-bottom:14px;">Huwelik</h3>
+    <div class="form-grid">
+      <div class="fg" style="position:relative;">
+        <label>Huwelik datum</label>
+        <input type="text" id="new_marriage_date_display" name="marriage_date_display"
+               class="gedcom-date" placeholder="Klik om datum te kies…" value="">
+        <input type="hidden" name="marriage_date" id="new_marriage_date" value="">
+      </div>
+      <div class="fg">
+        <label>Huwelik plek</label>{{ marriage_form_new.marriage_place }}
+        {% if marriage_form_new.marriage_place.errors %}<small style="color:var(--rust)">{{ marriage_form_new.marriage_place.errors|join:", " }}</small>{% endif %}
+      </div>
+      <div class="fg" style="position:relative;">
+        <label>Eind datum</label>
+        <input type="text" id="new_end_date_display" name="end_date_display"
+               class="gedcom-date" placeholder="Klik om datum te kies…" value="">
+        <input type="hidden" name="end_date" id="new_end_date" value="">
+      </div>
+      <div class="fg">
+        <label>Eind plek</label>{{ marriage_form_new.end_place }}
+        {% if marriage_form_new.end_place.errors %}<small style="color:var(--rust)">{{ marriage_form_new.end_place.errors|join:", " }}</small>{% endif %}
+      </div>
+      <div class="fg">
+        <label>Status</label>{{ marriage_form_new.status }}
+        {% if marriage_form_new.status.errors %}<small style="color:var(--rust)">{{ marriage_form_new.status.errors|join:", " }}</small>{% endif %}
+      </div>
+      <div class="fg full">
+        <label>Aantekeninge (huwelik)</label>
+        <textarea name="marriage_notes" rows="2"></textarea>
+        {% if marriage_form_new.notes.errors %}<small style="color:var(--rust)">{{ marriage_form_new.notes.errors|join:", " }}</small>{% endif %}
+      </div>
+    </div>
+    <div id="new-marriage-doc-section" style="display:none;">
+      <hr style="margin:20px 0;border-color:var(--border);">
+      <h4 id="new-marriage-doc-title" style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;"></h4>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Lêer</label>
+        <input type="file" name="doc_file" id="new-marriage-doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Dokumenttitel (opsioneel)</label>
+        <input type="text" name="doc_title" placeholder="Laat leeg vir outomatiese titel…">
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Beskrywing (opsioneel)</label>
+        <textarea name="doc_description" rows="2"></textarea>
+      </div>
+    </div>
+
+    <div class="fg full" style="margin-top:18px;">
+      <label>Wysigingsopsomming (opsioneel)</label>
+      <input type="text" name="note" placeholder="Kort beskrywing van hierdie wysiging…">
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">💾 Stoor</button>
+      <a href="{{ person1.get_absolute_url }}" class="btn btn-secondary">Kanselleer</a>
+    </div>
+  </form>
+</div>
+</div>
+
+<!-- ═══════════════════ BESTAANDE INSKRYWING (bestaande persoon) ═══════════════════ -->
+<div id="tab-existing" style="display:none;">
+<div class="card" style="max-width:640px;">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="mode" value="existing">
+    <input type="hidden" name="person1" value="{{ person1.pk }}">
+
+    <!-- Persoon 2 picker with Henry filter -->
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Persoon 2</label>
+      <div style="display:flex;gap:8px;margin-bottom:10px;">
+        <input type="text" id="person2-search" placeholder="Soek naam…" style="flex:1;" autocomplete="off">
+        <button type="button" class="btn btn-secondary" onclick="spOpenSpouse('person2','all')">Kies (Almal)</button>
+        <button type="button" class="btn btn-secondary" onclick="spOpenSpouse('person2','no_henry')">Kies (Sonder Henry)</button>
+      </div>
+      <div id="person2-selected" style="margin-bottom:8px;"></div>
+      <input type="hidden" name="person2" id="person2-value" value="{{ marriage_form_existing.person2.value|default:'' }}">
+      {% if marriage_form_existing.person2.errors %}<small style="color:var(--rust)">{{ marriage_form_existing.person2.errors|join:", " }}</small>{% endif %}
+    </div>
+
+    <div class="fg" style="margin-bottom:14px;position:relative;">
+      <label>Huwelik datum</label>
+      <input type="text" id="existing_marriage_date_display" name="marriage_date_display"
+             class="gedcom-date" placeholder="Klik om datum te kies…" value="">
+      <input type="hidden" name="marriage_date" id="existing_marriage_date" value="">
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Huwelik plek</label>{{ marriage_form_existing.marriage_place }}
+      {% if marriage_form_existing.marriage_place.errors %}<small style="color:var(--rust)">{{ marriage_form_existing.marriage_place.errors|join:", " }}</small>{% endif %}
+    </div>
+    <div class="fg" style="margin-bottom:14px;position:relative;">
+      <label>Eind datum</label>
+      <input type="text" id="existing_end_date_display" name="end_date_display"
+             class="gedcom-date" placeholder="Klik om datum te kies…" value="">
+      <input type="hidden" name="end_date" id="existing_end_date" value="">
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Eind plek</label>{{ marriage_form_existing.end_place }}
+      {% if marriage_form_existing.end_place.errors %}<small style="color:var(--rust)">{{ marriage_form_existing.end_place.errors|join:", " }}</small>{% endif %}
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Status</label>{{ marriage_form_existing.status }}
+      {% if marriage_form_existing.status.errors %}<small style="color:var(--rust)">{{ marriage_form_existing.status.errors|join:", " }}</small>{% endif %}
+    </div>
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Notas</label>{{ marriage_form_existing.notes }}
+      {% if marriage_form_existing.notes.errors %}<small style="color:var(--rust)">{{ marriage_form_existing.notes.errors|join:", " }}</small>{% endif %}
+    </div>
+
+    <div class="fg" style="margin-bottom:14px;">
+      <label>Wysigingsopsomming (opsioneel)</label>
+      <input type="text" name="note" placeholder="Kort nota oor hierdie wysiging…">
+    </div>
+
+    <!-- New document upload section (shown based on status) -->
+    <div id="existing-marriage-doc-section" style="display:none;">
+      <hr style="margin:20px 0;border-color:var(--border);">
+      <h4 id="existing-marriage-doc-title" style="margin-bottom:12px;color:var(--muted);font-size:13px;text-transform:uppercase;letter-spacing:.05em;"></h4>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Lêer</label>
+        <input type="file" name="doc_file" id="existing-marriage-doc-file-input" accept=".pdf,.jpg,.jpeg,.png">
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Dokumenttitel (opsioneel)</label>
+        <input type="text" name="doc_title" placeholder="Laat leeg vir outomatiese titel…">
+      </div>
+      <div class="fg" style="margin-bottom:14px;">
+        <label>Beskrywing (opsioneel)</label>
+        <textarea name="doc_description" rows="2"></textarea>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary">💾 Stoor</button>
+      <a href="{{ person1.get_absolute_url }}" class="btn btn-secondary">Kanselleer</a>
+    </div>
+  </form>
+</div>
+</div>
+
+{% include "genealogy/_sp_modal.html" %}
+
+<script src="{% static 'genealogy/js/gedcom_datepicker.js' %}"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  /* ── Tab switching ─────────────────────────────────────────────────── */
+  function asShowTab(tab) {
+    document.getElementById('tab-new').style.display      = (tab === 'new')      ? 'block' : 'none';
+    document.getElementById('tab-existing').style.display  = (tab === 'existing') ? 'block' : 'none';
+    document.getElementById('tab-new-btn').className      = 'btn btn-sm ' + (tab === 'new'      ? 'btn-primary' : 'btn-secondary');
+    document.getElementById('tab-existing-btn').className = 'btn btn-sm ' + (tab === 'existing' ? 'btn-primary' : 'btn-secondary');
+  }
+  asShowTab('{{ mode|default:"new" }}');
+
+  /* ── toggle death fields based on is_deceased checkbox ────────────── */
+  const isDeceasedCheckbox = document.querySelector('input[name="is_deceased"]');
+  const deathFields = document.getElementById('death-fields');
+  const deathDocSection = document.getElementById('death-doc-section');
+
+  function toggleDeathFields() {
+    if (isDeceasedCheckbox && deathFields) {
+      const show = isDeceasedCheckbox.checked;
+      deathFields.style.display = show ? 'block' : 'none';
+      if (deathDocSection) {
+        deathDocSection.style.display = show ? 'block' : 'none';
+      }
+    }
+  }
+
+  if (isDeceasedCheckbox) {
+    isDeceasedCheckbox.addEventListener('change', toggleDeathFields);
+    if (isDeceasedCheckbox.checked) {
+      toggleDeathFields();
+    }
+  }
+
+  /* ── toggle collapsible doc sections ───────────────────────────────── */
+  function toggleDocSection(sectionId, contentId) {
+    const section = document.getElementById(sectionId);
+    const content = document.getElementById(contentId);
+    if (section && content) {
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'block' : 'none';
+      section.style.display = 'block';
+    }
+  }
+
+  /* ── photo preview handler ─────────────────────────────────────────── */
+  const photoInput = document.querySelector('input[name="photo"]');
+  if (photoInput) {
+    const photoPreview = document.getElementById('photo-preview');
+    const photoImgPrev = document.getElementById('photo-img-preview');
+    const photoNameEl = document.getElementById('photo-preview-name');
+
+    photoInput.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) { photoPreview.style.display = 'none'; return; }
+
+      photoNameEl.textContent = file.name;
+      photoPreview.style.display = 'block';
+
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = function (e) { photoImgPrev.src = e.target.result; };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  /* ── age display between birth and death pickers ───────────────────── */
+  const birthInp = document.getElementById('birth_date_display');
+  const deathInp = document.getElementById('death_date_display');
+  const ageEl    = document.getElementById('age-display');
+
+  function refreshAge() {
+    if (!birthInp._gedcomState || !deathInp._gedcomState) return;
+    const age = GedcomDatePicker.calcAge(birthInp._gedcomState, deathInp._gedcomState);
+    ageEl.textContent = age !== 'Onbekend' ? 'Ouderdom: ' + age : '';
+  }
+
+  birthInp.addEventListener('change', refreshAge);
+  deathInp.addEventListener('change', refreshAge);
+
+  /* ── document preview handlers (birth / death certs) ────────────────── */
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  function setupDocPreview(prefix) {
+    const input = document.getElementById(prefix + '-doc-file-input');
+    const preview = document.getElementById(prefix + '-doc-preview');
+    const canvas = document.getElementById(prefix + '-doc-canvas');
+    const imgPrev = document.getElementById(prefix + '-doc-img-preview');
+    const nameEl = document.getElementById(prefix + '-doc-preview-name');
+
+    if (!input) return;
+
+    input.addEventListener('change', function () {
+      const file = this.files[0];
+      if (!file) { preview.style.display = 'none'; return; }
+
+      nameEl.textContent = file.name;
+      preview.style.display = 'block';
+
+      if (file.type === 'application/pdf') {
+        canvas.style.display = 'block';
+        imgPrev.style.display = 'none';
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          pdfjsLib.getDocument({ data: e.target.result }).promise.then(function (pdf) {
+            pdf.getPage(1).then(function (page) {
+              const viewport = page.getViewport({ scale: 0.5 });
+              canvas.width = viewport.width;
+              canvas.height = viewport.height;
+              page.render({ canvasContext: canvas.getContext('2d'), viewport: viewport });
+            });
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      } else if (file.type.startsWith('image/')) {
+        canvas.style.display = 'none';
+        imgPrev.style.display = 'block';
+        const reader = new FileReader();
+        reader.onload = function (e) { imgPrev.src = e.target.result; };
+        reader.readAsDataURL(file);
+      }
+    });
+  }
+
+  setupDocPreview('birth');
+  setupDocPreview('death');
+
+  /* ── status -> optional doc upload toggle (both tabs) ────────────────── */
+  function wireMarriageDocToggle(selectEl, sectionEl, titleEl) {
+    var labels = {
+      'married':  'Voeg Huwelik Sertifikaat by (Opsioneel)',
+      'divorced': 'Voeg Skeibrief by (Opsioneel)',
+      'annulled': 'Voeg Nietigverklaring Sertifikaat by (Opsioneel)',
+    };
+    function toggle() {
+      var v = selectEl ? selectEl.value : '';
+      var show = v === 'married' || v === 'divorced' || v === 'annulled';
+      sectionEl.style.display = show ? 'block' : 'none';
+      if (show) titleEl.textContent = labels[v] || 'Voeg Dokument by (Opsioneel)';
+    }
+    if (selectEl) { selectEl.addEventListener('change', toggle); toggle(); }
+  }
+  wireMarriageDocToggle(
+    document.getElementById('mnew_status'),
+    document.getElementById('new-marriage-doc-section'),
+    document.getElementById('new-marriage-doc-title')
+  );
+  wireMarriageDocToggle(
+    document.getElementById('mexist_status'),
+    document.getElementById('existing-marriage-doc-section'),
+    document.getElementById('existing-marriage-doc-title')
+  );
+</script>
+{% endblock %}

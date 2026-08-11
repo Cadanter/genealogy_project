@@ -51,6 +51,8 @@ urlpatterns = [
     path('mense/voeg-by/',                views.person_create,     name='person_create'),
     path('mense/<int:pk>/wysig/',         views.person_edit,       name='person_edit'),
     path('mense/<int:pk>/verwyder/',      views.person_delete,     name='person_delete'),
+    path('mense/<int:pk>/koppel-kind/',   views.person_add_child,  name='person_add_child'),
+    path('mense/<int:pk>/voeg-gade-by/',  views.person_add_spouse, name='person_add_spouse'),
     path('invoer/gedcom/',                views.import_gedcom,     name='import_gedcom'),
 
     # Admin only

@@ -6,6 +6,7 @@
   border: 1px solid var(--border);
   border-radius: 5px;
   overflow: hidden;
+  color: #b18697;
 }
 
 .node circle {
@@ -15,9 +16,20 @@
   cursor: pointer;
   transition: all .15s;
 }
-.node.male   circle { stroke: #1e3a8a; }
-.node.female circle { stroke: #831843; }
-.node circle:hover  { stroke-width: 3px; }
+
+.node.male circle {
+  stroke: #1e3a8a;
+  color: #1e3a8a;
+}
+
+.node.female circle {
+  stroke: #831843;
+  color: #831843;
+}
+
+.node circle:hover {
+  stroke-width: 3px;
+}
 
 .link {
   fill: none;
