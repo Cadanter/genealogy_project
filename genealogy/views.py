@@ -110,13 +110,15 @@ def person_list(request):
     people = Person.objects.all()
 
     if q:
-        people = people.filter(
-            Q(first_name__icontains=q)  |
-            Q(middle_name__icontains=q) |
-            Q(last_name__icontains=q)   |
-            Q(maiden_name__icontains=q) |
-            Q(birth_place__icontains=q)
-        )
+        terms = q.split()
+        for term in terms:
+            people = people.filter(
+                Q(first_name__icontains=term)  |
+                Q(middle_name__icontains=term) |
+                Q(last_name__icontains=term)   |
+                Q(maiden_name__icontains=term) |
+                Q(birth_place__icontains=term)
+            )
     if gender:
         people = people.filter(gender=gender)
 
@@ -174,9 +176,18 @@ def person_list(request):
         return [(letters, int(num)) for letters, num in parts]
 
     # Sort
-    if sort == 'henry' and henry_map:
-        people = sorted(people,
-            key=lambda p: henry_sort_key(henry_map.get(p.pk, '')))
+    def henry_or_birth_key(p):
+        henry_str = henry_map.get(p.pk)
+        if henry_str:
+            return (0, henry_sort_key(henry_str), 0)
+        try:
+            year = int(p.birth_year) if p.birth_year else 9999
+        except (ValueError, TypeError):
+            year = 9999
+        return (1, [], year)
+
+    if sort == 'henry':
+        people = sorted(people, key=henry_or_birth_key)
     elif sort == 'birth':
         people = sorted(people, key=lambda p: p.birth_year or 9999)
     else:
@@ -224,26 +235,26 @@ def person_detail(request, pk):
             'label': 'Gebore', 'place': person.birth_place, 'type': 'birth'})
     for sp in spouses:
         m = sp['marriage']
-        if m.marriage_date:
+        if m.marriage_date and m.marriage_date_display != 'Onbekend':
             timeline.append({'date': m.marriage_date_display,
                 'year': tl_year(m.marriage_date), 'raw_date': m.marriage_date,
                 'label': f'Getroud met {sp["person"].full_name}',
                 'place': m.marriage_place, 'type': 'marriage'})
-        if m.end_date:
+        if m.end_date and m.end_date_display != 'Onbekend':
             timeline.append({'date': m.end_date_display,
                 'year': tl_year(m.end_date), 'raw_date': m.end_date,
                 'label': f'{m.get_status_display()} van {sp["person"].full_name}',
                 'place': m.end_place, 'type': 'marriage_end'})
     for event in person.events.all():
-        if event.date:
+        if event.date and event.date_display != 'Onbekend':
             timeline.append({'date': event.date_display,
                 'year': tl_year(event.date), 'raw_date': event.date,
                 'label': event.title, 'place': event.place, 'type': 'event'})
+    timeline.sort(key=lambda x: tl_sort_key(x.get('raw_date', '')))
     if person.death_date:
         timeline.append({'date': person.death_date_display,
             'year': tl_year(person.death_date), 'raw_date': person.death_date,
             'label': 'Oorlede', 'place': person.death_place, 'type': 'death'})
-    timeline.sort(key=lambda x: tl_sort_key(x.get('raw_date', '')))
 
     audit_log = AuditLog.objects.filter(model_name='Person', object_id=pk).select_related('user')
 
@@ -596,6 +607,50 @@ def person_add_child(request, pk):
         'henry_map': henry_map,
     })
 
+@login_required
+def person_copy_children_to_spouse(request, pk):
+    """Kopieer een of meer van 'n persoon se reeds-gekoppelde kinders na 'n gekose gade."""
+    profile = get_profile(request.user)
+    person  = get_object_or_404(Person, pk=pk)
+
+    if not profile.is_approved:
+        messages.error(request, 'U rekening wag op goedkeuring.')
+        return redirect('genealogy:person_detail', pk=pk)
+    if not profile.can_edit:
+        messages.error(request, 'Slegs vertroude lede kan kinders koppel.')
+        return redirect('genealogy:person_detail', pk=pk)
+
+    if request.method == 'POST':
+        spouse_pk = request.POST.get('spouse')
+        child_pks = request.POST.getlist('children')
+        rel_type  = request.POST.get('relationship_type', 'parent')
+
+        # Sanity check: the target must actually be a spouse of this person
+        spouse_ids = {sp['person'].pk for sp in person.get_spouses()}
+        spouse = Person.objects.filter(pk=spouse_pk, pk__in=spouse_ids).first()
+        if not spouse:
+            messages.error(request, 'Ongeldige gade gekies.')
+            return redirect('genealogy:person_detail', pk=pk)
+
+        created = 0
+        for cpk in child_pks:
+            child = Person.objects.filter(pk=cpk).first()
+            if not child or child.pk == spouse.pk:
+                continue
+            rel, was_created = Relationship.objects.get_or_create(
+                person=spouse, relative=child, relationship_type=rel_type,
+            )
+            if was_created:
+                record_audit(request.user, 'create', rel,
+                    note=f'Gekopieer vanaf {person.full_name}')
+                created += 1
+
+        if created:
+            messages.success(request, f'{created} kind(ers) gekoppel aan {spouse.full_name}.')
+        else:
+            messages.info(request, 'Geen nuwe koppelinge gemaak nie — moontlik reeds bestaande.')
+
+    return redirect('genealogy:person_detail', pk=pk)
 
 @login_required
 def person_add_spouse(request, pk):

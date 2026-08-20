@@ -381,6 +381,28 @@
   birthInp.addEventListener('change', refreshAge);
   deathInp.addEventListener('change', refreshAge);
 
+  /* ── sync death date to marriage end date ───────────────────────────── */
+  const endDateDisplay = document.getElementById('new_end_date_display');
+  const endDateHidden = document.getElementById('new_end_date');
+
+  deathInp.addEventListener('change', function () {
+    if (endDateDisplay && endDateHidden) {
+      // Only sync death date to end date if person2's death date is not greater than person1's death date
+      const person1DeathDate = '{{ person1.death_date|default:"" }}';
+      if (!person1DeathDate || deathInp.value <= person1DeathDate) {
+        endDateDisplay.value = deathInp.value;
+        endDateHidden.value = document.getElementById('death_date').value;
+        // Change marriage status to 'widowed' when death date is set
+        if (endDateDisplay.value !== 'Onbekend') {
+          const statusSelect = document.getElementById('mnew_status');
+          if (statusSelect) {
+            statusSelect.value = 'widowed';
+          }
+        }
+      }
+    }
+  });
+
   /* ── document preview handlers (birth / death certs) ────────────────── */
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 

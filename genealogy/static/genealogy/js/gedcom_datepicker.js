@@ -47,7 +47,7 @@
   }
 
   function buildGedcomStr(s) {
-    if (s.mod === 'UNK') return '';
+    if (s.mod === 'UNK') return 'ONBEKEND';
     const isAft = s.mod === 'AFT';
     const mod = MODS.find(x => x.key === s.mod);
     const prefix = mod.gedcom ? mod.gedcom + ' ' : '';
@@ -96,13 +96,13 @@
   }
 
   /* ── popup HTML builder ──────────────────────────────────────────── */
-  function buildPartInput(s, field, placeholder, maxLen, onUpdate) {
+  function buildPartInput(s, field, label, maxLen, onUpdate) {
     const wrap = document.createElement('div');
     wrap.className = 'gdp-part';
 
     const lbl = document.createElement('div');
     lbl.className = 'gdp-part-label';
-    lbl.textContent = placeholder === '__' ? 'Dag' : (maxLen === 2 ? 'Maand' : 'Jaar');
+    lbl.textContent = label;
     wrap.appendChild(lbl);
 
     const inp = document.createElement('input');
@@ -125,9 +125,9 @@
   function buildDateFields(s, df, mf, yf, onUpdate) {
     const row = document.createElement('div');
     row.className = 'gdp-date-row';
-    row.appendChild(buildPartInput(s, df, '__', 2, onUpdate));
-    row.appendChild(buildPartInput(s, mf, '__', 2, onUpdate));
-    row.appendChild(buildPartInput(s, yf, '____', 4, onUpdate));
+    row.appendChild(buildPartInput(s, df, 'Dag', 2, onUpdate));
+    row.appendChild(buildPartInput(s, mf, 'Maand', 2, onUpdate));
+    row.appendChild(buildPartInput(s, yf, 'Jaar', 4, onUpdate));
     return row;
   }
 
